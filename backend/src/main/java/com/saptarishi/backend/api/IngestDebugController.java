@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.saptarishi.backend.graph.GraphBuilder;
+import com.saptarishi.backend.graph.GraphService;
 
 /** Temporary: lets us test ingestion in the browser. Replaced by POST /api/repos + jobs in step 5. */
 @RestController
@@ -27,12 +28,12 @@ public class IngestDebugController {
                           Map<String, Long> byLanguage, List<IndexedFile> firstFiles) {}
     private final RepoIngestor ingestor;
     private final RepoParser parser;
-    private final GraphBuilder graphBuilder;
+    private final GraphService graphService;
 
-    public IngestDebugController(RepoIngestor ingestor, RepoParser parser, GraphBuilder graphBuilder) {
+    public IngestDebugController(RepoIngestor ingestor, RepoParser parser, GraphService graphService) {
         this.ingestor = ingestor;
         this.parser = parser;
-        this.graphBuilder = graphBuilder;
+        this.graphService = graphService;
     }
     @GetMapping("/ingest")
     public Summary ingest(@RequestParam String url) throws IOException {
@@ -82,11 +83,7 @@ public class IngestDebugController {
     }
 
     @GetMapping("/graph")
-    public GraphBuilder.Graph graph(@RequestParam String url,
-                                @RequestParam(defaultValue = "false") boolean includeText) throws IOException {
-        var r = ingestor.ingest(url);
-        List<ParsedFile> parsed = parser.parseAll(r.sourceDir(), r.files());
-        return graphBuilder.build(parsed, includeText);
+    public GraphBuilder.Graph graph(@RequestParam String url) throws IOException {
+        return graphService.graphFor(url).graph();
     }
 }
-
