@@ -72,7 +72,7 @@ const layout = {
   packComponents: true,
 };
 
-export default function Atlas() {
+export default function Atlas({ sha, onBack }) {
   const containerRef = useRef(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -81,9 +81,7 @@ export default function Atlas() {
   // Fetch once.
   useEffect(() => {
     let cancelled = false;
-    fetch(
-      "/api/dev/graph?url=https://github.com/spring-projects/spring-petclinic",
-    )
+    fetch(`/api/repos/${sha}/graph`)
       .then((r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -93,7 +91,7 @@ export default function Atlas() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sha]);
 
   // Build the graph when data or the tests toggle changes.
   useEffect(() => {
@@ -119,26 +117,35 @@ export default function Atlas() {
         overflow: "hidden",
       }}
     >
-      <label
+      <div
         style={{
           position: "absolute",
           top: 8,
           left: 8,
           zIndex: 1,
-          fontSize: 13,
-          background: "#fff",
-          padding: "4px 8px",
-          borderRadius: 4,
-          border: "1px solid #ddd",
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
         }}
       >
-        <input
-          type="checkbox"
-          checked={!hideTests}
-          onChange={(e) => setHideTests(!e.target.checked)}
-        />{" "}
-        Show tests
-      </label>
+        <button onClick={onBack}>← New repo</button>
+        <label
+          style={{
+            fontSize: 13,
+            background: "#fff",
+            padding: "4px 8px",
+            borderRadius: 4,
+            border: "1px solid #ddd",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={!hideTests}
+            onChange={(e) => setHideTests(!e.target.checked)}
+          />{" "}
+          Show tests
+        </label>
+      </div>
       {error && (
         <p
           style={{

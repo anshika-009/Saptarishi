@@ -11,6 +11,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntConsumer;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,12 +23,23 @@ public class RepoParser {
     public RepoParser(ParserRegistry registry) { this.registry = registry; }
 
     public List<ParsedFile> parseAll(Path srcDir, List<IndexedFile> files) {
+        return parseAll(srcDir, files, done -> {});
+    }
+
+    public List<ParsedFile> parseAll(Path srcDir, List<IndexedFile> files, IntConsumer onFileDone) {
+        AtomicInteger finished = new AtomicInteger();
         int threads = Math.max(2, Runtime.getRuntime().availableProcessors());
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         try {
             List<Future<ParsedFile>> futures = new ArrayList<>(files.size());
             for (IndexedFile f : files) {
-                futures.add(pool.submit(() -> parseOne(srcDir, f)));
+                futures.add(pool.submit(() -> {
+                    try {
+                        return parseOne(srcDir, f);
+                    } finally {
+                        onFileDone.accept(finished.incrementAndGet());
+                    }
+                }));
             }
             List<ParsedFile> out = new ArrayList<>(files.size());
             for (int i = 0; i < futures.size(); i++) {

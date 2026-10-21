@@ -32,10 +32,11 @@ public class RepoIngestor {
         this.storageRoot = Path.of(storageDir).toAbsolutePath().normalize();
     }
 
-    public IngestResult ingest(String url) throws IOException {
-        GithubUrl gh = GithubUrl.parse(url);
-        String sha = github.resolveHeadSha(gh.owner(), gh.repo());
+    public String resolveSha(GithubUrl gh) throws IOException {
+        return github.resolveHeadSha(gh.owner(), gh.repo());
+    }
 
+    public IngestResult ingest(GithubUrl gh, String sha) throws IOException {
         Path repoDir = storageRoot.resolve("repos").resolve(sha);
         Path src = repoDir.resolve("src");
         Path done = repoDir.resolve(".done");

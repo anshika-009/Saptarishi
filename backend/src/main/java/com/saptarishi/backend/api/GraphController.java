@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/graphs")
+@RequestMapping("/api/repos")
 public class GraphController {
 
     private final GraphRepository repository;
@@ -18,7 +18,7 @@ public class GraphController {
         this.repository = repository;
     }
 
-    @GetMapping("/{sha}")
+    @GetMapping("/{sha}/graph")
     public ResponseEntity<Graph> get(@PathVariable String sha) {
         return repository.load(sha)
                 .map(ResponseEntity::ok)
