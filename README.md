@@ -74,16 +74,19 @@ Do not use the default credentials outside local development.
 - **Click a file** to open the code panel and highlight its neighbours. Blue edges are files it imports, and green edges are files that import it. Click the background to clear the selection.
 - **Code panel** shows read-only source with syntax highlighting, token count, complexity, line count, and clickable _Imports_ and _Imported by_ lists.
 - **Layouts:** _Clusters_ groups files by folder. _Hierarchy_ arranges them top-down with entry points (files nobody imports) on top.
-- **Show tests** includes or hides files under `test/`.
+- **Search:** the top bar searches file paths and symbol names (classes, interfaces, methods). Picking a result selects and centres that node. Picking a symbol also opens the file at its line.
+- **Filters:** a language dropdown and a path filter (for example `controller`) hide non-matching files without re-running the layout. Folders left empty are hidden too.
+- **Show tests** includes or hides files under `test/`. Picking a test file from search switches it on automatically.
 
 ## API
 
-| Method | Path                          | Description                                                                                                                    |
-| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `POST` | `/api/repos`                  | Body `{"url": "..."}`. Starts an analysis. Returns `200` with a finished job if the commit is already cached, otherwise `202`. |
-| `GET`  | `/api/jobs/{id}`              | Job state: `jobId`, `sha`, `state` (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), `stage`, `progress`, `error`.                      |
-| `GET`  | `/api/repos/{sha}/graph`      | The stored graph: `nodes` (path, folder, language, complexity, tokens, loc) and `edges`.                                       |
-| `GET`  | `/api/repos/{sha}/file?path=` | Source text plus metrics, `imports` and `importedBy`. `404` if unknown, `410` if the cached source was removed.                |
+| Method | Path                          | Description                                                                                                                                |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST` | `/api/repos`                  | Body `{"url": "..."}`. Starts an analysis. Returns `200` with a finished job if the commit is already cached, otherwise `202`.             |
+| `GET`  | `/api/jobs/{id}`              | Job state: `jobId`, `sha`, `state` (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), `stage`, `progress`, `error`.                                  |
+| `GET`  | `/api/repos/{sha}/graph`      | The stored graph: `nodes` (path, folder, language, complexity, tokens, loc) and `edges`.                                                   |
+| `GET`  | `/api/repos/{sha}/file?path=` | Source text plus metrics, `imports` and `importedBy`. `404` if unknown, `410` if the cached source was removed.                            |
+| `GET`  | `/api/repos/{sha}/search?q=`  | Case-insensitive substring search. Returns up to 8 `files` and 12 `symbols` (name, kind, line, path). Exact and prefix matches rank first. |
 
 Errors return `{"error": "..."}`: `400` for a bad URL or a missing or private repository, `422` for an unsafe archive, `502` for GitHub or network failures, and `503` when the job queue is full.
 
@@ -98,9 +101,10 @@ backend/src/main/java/com/saptarishi/backend/
 ├── parse/    Language support (Java today), parser registry, parsed-file model
 ├── graph/    Import resolution, graph building, PostgreSQL persistence
 ├── job/      Background jobs and progress tracking
-└── file/     Source and metrics for the code panel
+├── file/     Source and metrics for the code panel
+└── search/   File and symbol search
 backend/src/main/resources/db/migration/   Flyway schema (V1)
-frontend/src/   Home, Atlas, CodePanel, graph element builder
+frontend/src/   Home, Atlas, CodePanel, SearchBox, graph element builder
 ```
 
 ### Database
@@ -109,7 +113,7 @@ One migration (`V1__graph_schema.sql`) creates:
 
 - `repo_snapshot`: one row per analysed commit SHA.
 - `source_file`: path, folder, language, tokens, complexity, loc.
-- `symbol`: classes, interfaces and methods with line numbers (indexed for later search).
+- `symbol`: classes, interfaces and methods with line numbers (indexed by name for search).
 - `edge`: resolved import edges, indexed on the target for "imported by".
 
 Deleting a snapshot removes all of its rows.
@@ -133,10 +137,11 @@ cd backend
 ./mvnw test
 ```
 
-Docker must be running: the database tests start PostgreSQL through Testcontainers. The suite covers URL parsing, safe extraction, the Java parser, import resolution, graph persistence and the file endpoint.
+Docker must be running: the database tests start PostgreSQL through Testcontainers. The suite covers URL parsing, safe extraction, the Java parser, import resolution, graph persistence, the file endpoint and search.
 
 ## Known limitations
 
+- Search covers source files in the graph only, not text files.
 - Only Java is parsed. Other source languages appear in the file index but not in the graph.
 - Only imports that resolve to files inside the repository become edges. Library imports are ignored.
 - Public GitHub repositories only.
@@ -152,7 +157,7 @@ Docker must be running: the database tests start PostgreSQL through Testcontaine
 - [x] Resolution and graph: real edges, saved to PostgreSQL
 - [x] Jobs and progress: async execution, polling, caching by SHA
 - [x] Atlas and code panel: compound folders, layouts, highlighting, Monaco
-- [ ] Search and filters
+- [x] Search and filters
 - [ ] JavaScript, TypeScript and Python support
 - [ ] Hardening: zip-bomb tests, error handling, timing benchmarks
 - [ ] Zip upload and a visual redesign
