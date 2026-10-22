@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import { toElements } from "./graphUtils";
+import CodePanel from "./CodePanel";
 
 cytoscape.use(fcose);
+
+const OUT = "#2b7bd9";
+const IN = "#2a9d5c";
 
 const style = [
   {
@@ -55,112 +59,219 @@ const style = [
       "curve-style": "bezier",
     },
   },
+  { selector: ".dim", style: { opacity: 0.1 } },
+  {
+    selector: "node.sel",
+    style: { "border-width": 3, "border-color": "#111" },
+  },
+  {
+    selector: "edge.out",
+    style: {
+      "line-color": OUT,
+      "target-arrow-color": OUT,
+      width: 2.5,
+      opacity: 1,
+    },
+  },
+  {
+    selector: "edge.in",
+    style: {
+      "line-color": IN,
+      "target-arrow-color": IN,
+      width: 2.5,
+      opacity: 1,
+    },
+  },
 ];
 
-const layout = {
-  name: "fcose",
-  animate: false,
-  fit: true,
-  padding: 40,
-  randomize: false, // deterministic: same graph gives same picture
-  quality: "proof",
-  nodeDimensionsIncludeLabels: true, // reserve room for labels so they collide less
-  nodeRepulsion: () => 60000,
-  idealEdgeLength: () => 140,
-  nestingFactor: 0.1,
-  nodeSeparation: 160,
-  packComponents: true,
+const LAYOUTS = {
+  clusters: {
+    label: "Clusters (by folder)",
+    flat: false,
+    options: {
+      name: "fcose",
+      animate: false,
+      fit: true,
+      padding: 40,
+      randomize: false,
+      quality: "proof",
+      nodeDimensionsIncludeLabels: true,
+      nodeRepulsion: () => 60000,
+      idealEdgeLength: () => 140,
+      nestingFactor: 0.1,
+      nodeSeparation: 160,
+      packComponents: true,
+    },
+  },
+  hierarchy: {
+    label: "Hierarchy (entry points on top)",
+    flat: true,
+    options: {
+      name: "breadthfirst",
+      directed: true,
+      spacingFactor: 1.2,
+      padding: 40,
+      animate: false,
+    },
+  },
 };
 
 export default function Atlas({ sha, onBack }) {
   const containerRef = useRef(null);
+  const cyRef = useRef(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [hideTests, setHideTests] = useState(true);
+  const [layoutName, setLayoutName] = useState("clusters");
+  const [selection, setSelection] = useState(null); // { id, center }
 
-  // Fetch once.
   useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/repos/${sha}/graph`)
+    const ctrl = new AbortController();
+    fetch(`/api/repos/${sha}/graph`, { signal: ctrl.signal })
       .then((r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       })
-      .then((d) => !cancelled && setData(d))
-      .catch((e) => !cancelled && setError(e.message));
-    return () => {
-      cancelled = true;
-    };
+      .then(setData)
+      .catch((e) => e.name !== "AbortError" && setError(e.message));
+    return () => ctrl.abort();
   }, [sha]);
 
-  // Build the graph when data or the tests toggle changes.
   useEffect(() => {
     if (!data) return;
+    const { flat, options } = LAYOUTS[layoutName];
+    let elements = toElements(data, { hideTests });
+    if (flat) {
+      elements = elements
+        .filter((e) => e.data.kind !== "folder")
+        .map((e) => ({ data: { ...e.data, parent: undefined } }));
+    }
     const cy = cytoscape({
       container: containerRef.current,
-      elements: toElements(data, { hideTests }),
+      elements,
       style,
-      layout,
+      layout: options,
     });
     cy.on("tap", 'node[kind = "file"]', (evt) =>
-      console.log("clicked", evt.target.id()),
+      setSelection({ id: evt.target.id(), center: false }),
     );
-    return () => cy.destroy();
-  }, [data, hideTests]);
+    cy.on("tap", (evt) => evt.target === cy && setSelection(null));
+    cyRef.current = cy;
+    return () => {
+      cy.destroy();
+      cyRef.current = null;
+    };
+  }, [data, hideTests, layoutName]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const node = selection ? cy.getElementById(selection.id) : null;
+    cy.batch(() => {
+      cy.elements().removeClass("dim sel in out");
+      if (!node || node.empty()) return;
+      cy.elements('node[kind = "file"], edge').addClass("dim");
+      node.closedNeighborhood().removeClass("dim");
+      node.addClass("sel");
+      node.outgoers("edge").addClass("out");
+      node.incomers("edge").addClass("in");
+    });
+    if (selection?.center && node && !node.empty()) {
+      cy.animate(
+        { center: { eles: node }, zoom: Math.max(cy.zoom(), 1) },
+        { duration: 300 },
+      );
+    }
+  }, [selection, data, hideTests, layoutName]);
+
+  const panelOpen = selection !== null;
+  useEffect(() => {
+    cyRef.current?.resize();
+  }, [panelOpen]);
+
+  const navigate = (id) => setSelection({ id, center: true });
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-      }}
-    >
+    <div style={{ display: "flex", width: "100%", height: "100%" }}>
       <div
         style={{
-          position: "absolute",
-          top: 8,
-          left: 8,
-          zIndex: 1,
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
+          position: "relative",
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
         }}
       >
-        <button onClick={onBack}>← New repo</button>
-        <label
-          style={{
-            fontSize: 13,
-            background: "#fff",
-            padding: "4px 8px",
-            borderRadius: 4,
-            border: "1px solid #ddd",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={!hideTests}
-            onChange={(e) => setHideTests(!e.target.checked)}
-          />{" "}
-          Show tests
-        </label>
-      </div>
-      {error && (
-        <p
+        <div
           style={{
             position: "absolute",
             top: 8,
-            right: 8,
+            left: 8,
             zIndex: 1,
-            color: "crimson",
-            margin: 0,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
           }}
         >
-          Could not load graph: {error}
-        </p>
+          <button onClick={onBack}>← New repo</button>
+          <select
+            value={layoutName}
+            onChange={(e) => setLayoutName(e.target.value)}
+          >
+            {Object.entries(LAYOUTS).map(([key, l]) => (
+              <option key={key} value={key}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <label
+            style={{
+              fontSize: 13,
+              background: "#fff",
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: "1px solid #ddd",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={!hideTests}
+              onChange={(e) => setHideTests(!e.target.checked)}
+            />{" "}
+            Show tests
+          </label>
+        </div>
+        {error && (
+          <p
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              color: "crimson",
+              margin: 0,
+            }}
+          >
+            Could not load graph: {error}
+          </p>
+        )}
+        <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      </div>
+      {selection && (
+        <div
+          style={{
+            width: 480,
+            borderLeft: "1px solid #ddd",
+            background: "#fff",
+          }}
+        >
+          <CodePanel
+            sha={sha}
+            path={selection.id}
+            onNavigate={navigate}
+            onClose={() => setSelection(null)}
+          />
+        </div>
       )}
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
     </div>
   );
 }
