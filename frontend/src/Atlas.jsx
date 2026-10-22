@@ -60,6 +60,19 @@ const style = [
       "curve-style": "bezier",
     },
   },
+  {
+    selector: "node.cyc",
+    style: { "border-width": 3, "border-color": "#d93025" },
+  },
+  {
+    selector: "edge.cyc",
+    style: {
+      "line-color": "#d93025",
+      "target-arrow-color": "#d93025",
+      width: 2.5,
+      opacity: 1,
+    },
+  },
   { selector: ".hidden", style: { display: "none" } },
   { selector: ".dim", style: { opacity: 0.1 } },
   {
@@ -128,10 +141,23 @@ export default function Atlas({ sha, onBack }) {
   const [selection, setSelection] = useState(null); // { id, center, line }
   const [lang, setLang] = useState("all");
   const [pathFilter, setPathFilter] = useState("");
+  const [analysis, setAnalysis] = useState(null); // { cycles, nodes }
+  const [showCycles, setShowCycles] = useState(true);
   const languages = useMemo(
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
     [data],
   );
+  const metricsById = useMemo(
+    () => new Map((analysis?.nodes ?? []).map((m) => [m.id, m])),
+    [analysis],
+  );
+  const cycleOf = useMemo(() => {
+    const map = new Map();
+    for (const cycle of analysis?.cycles ?? []) {
+      for (const id of cycle) map.set(id, cycle);
+    }
+    return map;
+  }, [analysis]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -142,6 +168,15 @@ export default function Atlas({ sha, onBack }) {
       })
       .then(setData)
       .catch((e) => e.name !== "AbortError" && setError(e.message));
+    return () => ctrl.abort();
+  }, [sha]);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`/api/repos/${sha}/analysis`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setAnalysis)
+      .catch((e) => e.name !== "AbortError" && setAnalysis(null));
     return () => ctrl.abort();
   }, [sha]);
 
@@ -170,6 +205,25 @@ export default function Atlas({ sha, onBack }) {
       cyRef.current = null;
     };
   }, [data, hideTests, layoutName]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.batch(() => {
+      cy.elements().removeClass("cyc");
+      if (!showCycles || !analysis) return;
+      for (const cycle of analysis.cycles) {
+        const members = new Set(cycle);
+        cycle.forEach((id) => cy.getElementById(id).addClass("cyc"));
+        cy.edges()
+          .filter(
+            (e) =>
+              members.has(e.data("source")) && members.has(e.data("target")),
+          )
+          .addClass("cyc");
+      }
+    });
+  }, [analysis, showCycles, data, hideTests, layoutName]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -287,6 +341,22 @@ export default function Atlas({ sha, onBack }) {
             />{" "}
             Show tests
           </label>
+          <label
+            style={{
+              fontSize: 13,
+              background: "#fff",
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: "1px solid #ddd",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showCycles}
+              onChange={(e) => setShowCycles(e.target.checked)}
+            />{" "}
+            Circular imports ({analysis ? analysis.cycles.length : "…"})
+          </label>
         </div>
         {error && (
           <p
@@ -316,6 +386,8 @@ export default function Atlas({ sha, onBack }) {
             sha={sha}
             path={selection.id}
             line={selection.line}
+            metrics={metricsById.get(selection.id)}
+            cycle={cycleOf.get(selection.id)}
             onNavigate={navigate}
             onClose={() => setSelection(null)}
           />

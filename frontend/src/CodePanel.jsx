@@ -36,7 +36,15 @@ function Links({ title, color, items, onNavigate }) {
   );
 }
 
-export default function CodePanel({ sha, path, line, onNavigate, onClose }) {
+export default function CodePanel({
+  sha,
+  path,
+  line,
+  metrics,
+  cycle,
+  onNavigate,
+  onClose,
+}) {
   const [result, setResult] = useState({});
 
   useEffect(() => {
@@ -81,6 +89,15 @@ export default function CodePanel({ sha, path, line, onNavigate, onClose }) {
             lines
           </div>
         )}
+        {data && analysed && metrics && (
+          <div
+            style={{ fontSize: 12, color: "#666", margin: "0 0 8px" }}
+            title="Blast radius: files that depend on this one, directly or through other files"
+          >
+            used by {metrics.fanIn} · uses {metrics.fanOut} · blast radius{" "}
+            {metrics.blastRadius}
+          </div>
+        )}
         {data && !analysed && (
           <div style={{ fontSize: 12, color: "#a15c00", margin: "4px 0 8px" }}>
             {data.loc} lines · imports and complexity are not analysed for{" "}
@@ -101,6 +118,14 @@ export default function CodePanel({ sha, path, line, onNavigate, onClose }) {
               items={data.importedBy}
               onNavigate={onNavigate}
             />
+            {cycle && (
+              <Links
+                title="⟲ In a circular dependency with"
+                color="#d93025"
+                items={cycle.filter((p) => p !== path)}
+                onNavigate={onNavigate}
+              />
+            )}
           </>
         )}
       </div>
