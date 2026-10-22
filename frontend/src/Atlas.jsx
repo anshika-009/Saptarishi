@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import { toElements } from "./graphUtils";
 import CodePanel from "./CodePanel";
+import SearchBox from "./SearchBox";
 
 cytoscape.use(fcose);
 
@@ -59,6 +60,7 @@ const style = [
       "curve-style": "bezier",
     },
   },
+  { selector: ".hidden", style: { display: "none" } },
   { selector: ".dim", style: { opacity: 0.1 } },
   {
     selector: "node.sel",
@@ -123,7 +125,13 @@ export default function Atlas({ sha, onBack }) {
   const [error, setError] = useState(null);
   const [hideTests, setHideTests] = useState(true);
   const [layoutName, setLayoutName] = useState("clusters");
-  const [selection, setSelection] = useState(null); // { id, center }
+  const [selection, setSelection] = useState(null); // { id, center, line }
+  const [lang, setLang] = useState("all");
+  const [pathFilter, setPathFilter] = useState("");
+  const languages = useMemo(
+    () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
+    [data],
+  );
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -153,7 +161,7 @@ export default function Atlas({ sha, onBack }) {
       layout: options,
     });
     cy.on("tap", 'node[kind = "file"]', (evt) =>
-      setSelection({ id: evt.target.id(), center: false }),
+      setSelection({ id: evt.target.id(), center: false, line: null }),
     );
     cy.on("tap", (evt) => evt.target === cy && setSelection(null));
     cyRef.current = cy;
@@ -184,12 +192,35 @@ export default function Atlas({ sha, onBack }) {
     }
   }, [selection, data, hideTests, layoutName]);
 
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const f = pathFilter.trim().toLowerCase();
+    cy.batch(() => {
+      cy.elements().removeClass("hidden");
+      cy.nodes('[kind = "file"]')
+        .filter(
+          (n) =>
+            (lang !== "all" && n.data("language") !== lang) ||
+            (f && !n.id().toLowerCase().includes(f)),
+        )
+        .addClass("hidden");
+      cy.nodes('[kind = "folder"]').forEach((folder) => {
+        if (folder.descendants('[kind = "file"]').not(".hidden").empty())
+          folder.addClass("hidden");
+      });
+    });
+  }, [lang, pathFilter, data, hideTests, layoutName]);
+
   const panelOpen = selection !== null;
   useEffect(() => {
     cyRef.current?.resize();
   }, [panelOpen]);
 
-  const navigate = (id) => setSelection({ id, center: true });
+  const navigate = (id, line = null) => {
+    if (cyRef.current?.getElementById(id).empty()) setHideTests(false);
+    setSelection({ id, center: true, line });
+  };
 
   return (
     <div style={{ display: "flex", width: "100%", height: "100%" }}>
@@ -206,13 +237,16 @@ export default function Atlas({ sha, onBack }) {
             position: "absolute",
             top: 8,
             left: 8,
-            zIndex: 1,
+            zIndex: 2,
             display: "flex",
+            flexWrap: "wrap",
             gap: 8,
             alignItems: "center",
+            maxWidth: "calc(100% - 16px)",
           }}
         >
           <button onClick={onBack}>← New repo</button>
+          <SearchBox sha={sha} onPick={navigate} />
           <select
             value={layoutName}
             onChange={(e) => setLayoutName(e.target.value)}
@@ -223,6 +257,20 @@ export default function Atlas({ sha, onBack }) {
               </option>
             ))}
           </select>
+          <select value={lang} onChange={(e) => setLang(e.target.value)}>
+            <option value="all">All languages</option>
+            {languages.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <input
+            value={pathFilter}
+            onChange={(e) => setPathFilter(e.target.value)}
+            placeholder="Filter by path…"
+            style={{ width: 130, padding: "5px 8px" }}
+          />
           <label
             style={{
               fontSize: 13,
@@ -267,6 +315,7 @@ export default function Atlas({ sha, onBack }) {
           <CodePanel
             sha={sha}
             path={selection.id}
+            line={selection.line}
             onNavigate={navigate}
             onClose={() => setSelection(null)}
           />

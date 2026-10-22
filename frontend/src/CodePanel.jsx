@@ -33,7 +33,7 @@ function Links({ title, color, items, onNavigate }) {
   );
 }
 
-export default function CodePanel({ sha, path, onNavigate, onClose }) {
+export default function CodePanel({ sha, path, line, onNavigate, onClose }) {
   const [result, setResult] = useState({});
 
   useEffect(() => {
@@ -101,9 +101,15 @@ export default function CodePanel({ sha, path, onNavigate, onClose }) {
         )}
         {data && (
           <Editor
+            key={`${path}:${line ?? ""}`}
             path={path}
             language={data.language}
             value={data.content}
+            onMount={(editor) => {
+              if (!line) return;
+              editor.revealLineInCenter(line);
+              editor.setPosition({ lineNumber: line, column: 1 });
+            }}
             options={{
               readOnly: true,
               minimap: { enabled: false },
