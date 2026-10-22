@@ -3,6 +3,9 @@ import Editor from "@monaco-editor/react";
 
 const name = (p) => p.split("/").pop();
 
+// Languages with a parser. Others are shown as plain files until their plugin exists.
+const ANALYSED = new Set(["java"]);
+
 function Links({ title, color, items, onNavigate }) {
   return (
     <div style={{ marginBottom: 6 }}>
@@ -54,6 +57,7 @@ export default function CodePanel({ sha, path, line, onNavigate, onClose }) {
   }, [sha, path]);
 
   const { data, error } = result.path === path ? result : {};
+  const analysed = data ? ANALYSED.has(data.language) : false;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -71,13 +75,19 @@ export default function CodePanel({ sha, path, line, onNavigate, onClose }) {
             ×
           </button>
         </div>
-        {data && (
+        {data && analysed && (
           <div style={{ fontSize: 12, color: "#666", margin: "4px 0 8px" }}>
             {data.tokens} tokens · complexity {data.complexity} · {data.loc}{" "}
             lines
           </div>
         )}
-        {data && (
+        {data && !analysed && (
+          <div style={{ fontSize: 12, color: "#a15c00", margin: "4px 0 8px" }}>
+            {data.loc} lines · imports and complexity are not analysed for{" "}
+            {data.language} yet
+          </div>
+        )}
+        {data && analysed && (
           <>
             <Links
               title="→ Imports"

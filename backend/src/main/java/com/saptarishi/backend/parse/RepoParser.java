@@ -62,14 +62,25 @@ public class RepoParser {
     private ParsedFile parseOne(Path srcDir, IndexedFile f) {
         LanguageSupport plugin = registry.forLanguage(f.language());
         if (plugin == null) {
-            // No parser for this language: plain node, not "broken".
-            return new ParsedFile(f.path(), f.language(), "", List.of(), List.of(), 0, 0, 0, true);
+            // No parser for this language: a plain node, not "broken". We still count its lines.
+            int loc = "text".equals(f.language()) ? 0 : countLines(srcDir.resolve(f.path()));
+            return new ParsedFile(f.path(), f.language(), "", List.of(), List.of(), 0, 0, loc, true);
         }
         try {
             String content = Files.readString(srcDir.resolve(f.path()), StandardCharsets.UTF_8);
             return plugin.parse(f.path(), content);
         } catch (IOException e) { // e.g. not valid UTF-8
             return ParsedFile.unparsed(f.path(), f.language(), 0);
+        }
+    }
+
+    /** Non-blank lines, or 0 if the file can't be read as UTF-8. */
+    private static int countLines(Path file) {
+        try {
+            return (int) Files.readString(file, StandardCharsets.UTF_8).lines()
+                    .filter(l -> !l.isBlank()).count();
+        } catch (IOException e) {
+            return 0;
         }
     }
 }
