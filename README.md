@@ -77,6 +77,27 @@ Do not use the default credentials outside local development.
 - **Search:** the top bar searches file paths and symbol names (classes, interfaces, methods). Picking a result selects and centres that node. Picking a symbol also opens the file at its line.
 - **Filters:** a language dropdown and a path filter (for example `controller`) hide non-matching files without re-running the layout. Folders left empty are hidden too.
 - **Show tests** includes or hides files under `test/`. Picking a test file from search switches it on automatically.
+- **Circular imports** are outlined in red. **God files** are outlined in purple (see below). Both can be switched off with their checkboxes.
+- **Health card** (bottom left): the repository's score, why it lost points, and its god files. Click a god file to jump to it.
+
+## Health score and god files
+
+Both are computed on the fly from the stored graph. Test files are left out, because their imports would inflate the connectivity of the classes they exercise, and `package-info.java` and `module-info.java` are ignored.
+
+**God file.** A file that is in the top 5% of its own repository for all three of size (lines), complexity (cyclomatic, summed over its methods) and connectivity (files that import it plus files it imports), and that also clears absolute floors: 300 lines, complexity 40 and 10 connections. Each factor is turned into a percentile rank, and the god score is `100 × size × complexity × connectivity` (each as a 0 to 1 rank), so a file has to be high on all three to score high. A large complex file that nothing else touches is not a god file, and neither is a heavily imported constants file. Because the rule is relative, a repository can have at most about 5% god files.
+
+**Health score.** 100 minus four capped penalties, shown as a breakdown:
+
+| Factor           | Max loss | Rule                                                                      |
+| ---------------- | -------- | ------------------------------------------------------------------------- |
+| Circular imports | 25       | `ceil(60 × share of files that sit in a cycle)`                           |
+| God files        | 25       | 4 points per god file                                                     |
+| Complexity       | 25       | Complexity per line of code: 0 points at 0.15 or below, full loss at 0.40 |
+| Coupling         | 25       | Average number of files each file imports: 0 points at 3, full loss at 10 |
+
+Grades: A 85 and above, B 70, C 55, D 40, F below.
+
+The thresholds are a judgement call, tuned on a few real Java codebases (React Native's Android layer and its sub-packages, Capacitor, Cordova). On those the score ranged from the 50s to the low 90s, and well-factored packages scored higher than tangled ones. The complexity and coupling thresholds are the least tested, since those repositories were all similar on those two measures. The score is a heuristic for comparing and for finding things to look at, not a measurement of quality. All constants are at the top of `HealthScore.java`.
 
 ## API
 
@@ -86,6 +107,8 @@ Do not use the default credentials outside local development.
 | `GET`  | `/api/jobs/{id}`              | Job state: `jobId`, `sha`, `state` (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), `stage`, `progress`, `error`.                                  |
 | `GET`  | `/api/repos/{sha}/graph`      | The stored graph: `nodes` (path, folder, language, complexity, tokens, loc) and `edges`.                                                   |
 | `GET`  | `/api/repos/{sha}/file?path=` | Source text plus metrics, `imports` and `importedBy`. `404` if unknown, `410` if the cached source was removed.                            |
+| `GET`  | `/api/repos/{sha}/analysis`   | Circular-import groups, plus per-file fan-in, fan-out and blast radius.                                                                    |
+| `GET`  | `/api/repos/{sha}/health`     | Health score (0 to 100), grade, the four-factor breakdown and the god files. Test files are excluded.                                      |
 | `GET`  | `/api/repos/{sha}/search?q=`  | Case-insensitive substring search. Returns up to 8 `files` and 12 `symbols` (name, kind, line, path). Exact and prefix matches rank first. |
 
 Errors return `{"error": "..."}`: `400` for a bad URL or a missing or private repository, `422` for an unsafe archive, `502` for GitHub or network failures, and `503` when the job queue is full.
@@ -137,7 +160,7 @@ cd backend
 ./mvnw test
 ```
 
-Docker must be running: the database tests start PostgreSQL through Testcontainers. The suite covers URL parsing, safe extraction, the Java parser, import resolution, graph persistence, the file endpoint and search.
+Docker must be running: the database tests start PostgreSQL through Testcontainers. The suite covers URL parsing, safe extraction, the Java parser, import resolution, graph persistence, graph analysis, the health score, the file endpoint and search.
 
 ## Known limitations
 
@@ -158,6 +181,8 @@ Docker must be running: the database tests start PostgreSQL through Testcontaine
 - [x] Jobs and progress: async execution, polling, caching by SHA
 - [x] Atlas and code panel: compound folders, layouts, highlighting, Monaco
 - [x] Search and filters
+- [x] Health score and god files
+- [ ] Churn (needs git history, via JGit)
 - [ ] JavaScript, TypeScript and Python support
 - [ ] Hardening: zip-bomb tests, error handling, timing benchmarks
 - [ ] Zip upload and a visual redesign

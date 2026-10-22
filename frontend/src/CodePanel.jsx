@@ -42,6 +42,7 @@ export default function CodePanel({
   line,
   metrics,
   cycle,
+  god,
   onNavigate,
   onClose,
 }) {
@@ -102,6 +103,15 @@ export default function CodePanel({
           <div style={{ fontSize: 12, color: "#a15c00", margin: "4px 0 8px" }}>
             {data.loc} lines · imports and complexity are not analysed for{" "}
             {data.language} yet
+          </div>
+        )}
+        {data && analysed && god && (
+          <div
+            style={{ fontSize: 12, color: "#8e24aa", margin: "0 0 8px" }}
+            title="In the top 5% of this repository for size, complexity and connections at once"
+          >
+            ⚠ God file · {god.loc} lines, complexity {god.complexity},{" "}
+            {god.fanIn + god.fanOut} connections
           </div>
         )}
         {data && analysed && (

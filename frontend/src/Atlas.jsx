@@ -4,11 +4,13 @@ import fcose from "cytoscape-fcose";
 import { toElements } from "./graphUtils";
 import CodePanel from "./CodePanel";
 import SearchBox from "./SearchBox";
+import HealthPanel from "./HealthPanel";
 
 cytoscape.use(fcose);
 
 const OUT = "#2b7bd9";
 const IN = "#2a9d5c";
+const GOD = "#8e24aa";
 
 const style = [
   {
@@ -72,6 +74,10 @@ const style = [
       width: 2.5,
       opacity: 1,
     },
+  },
+  {
+    selector: "node.god",
+    style: { "border-width": 4, "border-color": GOD },
   },
   { selector: ".hidden", style: { display: "none" } },
   { selector: ".dim", style: { opacity: 0.1 } },
@@ -143,6 +149,8 @@ export default function Atlas({ sha, onBack }) {
   const [pathFilter, setPathFilter] = useState("");
   const [analysis, setAnalysis] = useState(null); // { cycles, nodes }
   const [showCycles, setShowCycles] = useState(true);
+  const [health, setHealth] = useState(null); // { score, grade, factors, godFiles, ... }
+  const [showGods, setShowGods] = useState(true);
   const languages = useMemo(
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
     [data],
@@ -150,6 +158,10 @@ export default function Atlas({ sha, onBack }) {
   const metricsById = useMemo(
     () => new Map((analysis?.nodes ?? []).map((m) => [m.id, m])),
     [analysis],
+  );
+  const godById = useMemo(
+    () => new Map((health?.godFiles ?? []).map((g) => [g.id, g])),
+    [health],
   );
   const cycleOf = useMemo(() => {
     const map = new Map();
@@ -177,6 +189,15 @@ export default function Atlas({ sha, onBack }) {
       .then((r) => (r.ok ? r.json() : null))
       .then(setAnalysis)
       .catch((e) => e.name !== "AbortError" && setAnalysis(null));
+    return () => ctrl.abort();
+  }, [sha]);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`/api/repos/${sha}/health`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setHealth)
+      .catch((e) => e.name !== "AbortError" && setHealth(null));
     return () => ctrl.abort();
   }, [sha]);
 
@@ -224,6 +245,16 @@ export default function Atlas({ sha, onBack }) {
       }
     });
   }, [analysis, showCycles, data, hideTests, layoutName]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.batch(() => {
+      cy.nodes().removeClass("god");
+      if (!showGods || !health) return;
+      for (const g of health.godFiles) cy.getElementById(g.id).addClass("god");
+    });
+  }, [health, showGods, data, hideTests, layoutName]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -357,6 +388,23 @@ export default function Atlas({ sha, onBack }) {
             />{" "}
             Circular imports ({analysis ? analysis.cycles.length : "…"})
           </label>
+          <label
+            style={{
+              fontSize: 13,
+              background: "#fff",
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: "1px solid #ddd",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showGods}
+              onChange={(e) => setShowGods(e.target.checked)}
+            />{" "}
+            <span style={{ color: GOD }}>God files</span> (
+            {health ? health.godFiles.length : "…"})
+          </label>
         </div>
         {error && (
           <p
@@ -373,6 +421,7 @@ export default function Atlas({ sha, onBack }) {
           </p>
         )}
         <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+        <HealthPanel health={health} onNavigate={navigate} />
       </div>
       {selection && (
         <div
@@ -388,6 +437,7 @@ export default function Atlas({ sha, onBack }) {
             line={selection.line}
             metrics={metricsById.get(selection.id)}
             cycle={cycleOf.get(selection.id)}
+            god={godById.get(selection.id)}
             onNavigate={navigate}
             onClose={() => setSelection(null)}
           />
