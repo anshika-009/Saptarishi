@@ -7,10 +7,13 @@ import com.saptarishi.backend.ingest.RepoIngestor;
 import com.saptarishi.backend.ingest.SafeUnzipper.UnsafeArchiveException;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +32,11 @@ public class InProcessJobService implements JobService {
     private static final Logger log = LoggerFactory.getLogger(InProcessJobService.class);
     private static final int QUEUE_CAPACITY = 20;
     private static final Duration RETENTION = Duration.ofHours(1);
+
+    @FunctionalInterface
+    private interface Analysis {
+        void run(Job job) throws IOException;
+    }
 
     private final RepoIngestor ingestor;
     private final GraphRepository repository;
@@ -57,8 +65,24 @@ public class InProcessJobService implements JobService {
     public JobStatus submit(String url) throws IOException {
         GithubUrl gh = GithubUrl.parse(url);
         String sha = ingestor.resolveSha(gh);
+        return enqueue(sha, job -> pipeline.analyze(gh, sha, job::update), () -> {});
+    }
 
+    @Override
+    public JobStatus submitUpload(String name, String sha, Path zip) {
+        try {
+            return enqueue(sha, job -> pipeline.analyzeUpload(name, sha, zip, job::update),
+                    () -> deleteQuietly(zip));
+        } catch (RuntimeException e) {
+            deleteQuietly(zip);
+            throw e;
+        }
+    }
+
+    /** cleanup runs exactly once: right away if no analysis is started, otherwise when it ends. */
+    private JobStatus enqueue(String sha, Analysis analysis, Runnable cleanup) {
         if (repository.exists(sha)) {
+            cleanup.run();
             Job cached = Job.completed(sha);
             jobsById.put(cached.id(), cached);
             return cached.snapshot();
@@ -67,16 +91,20 @@ public class InProcessJobService implements JobService {
         synchronized (lock) {
             purgeExpired();
             Job running = activeBySha.get(sha);
-            if (running != null) return running.snapshot();
+            if (running != null) {
+                cleanup.run();
+                return running.snapshot();
+            }
 
             Job job = new Job(sha, JobStatus.State.QUEUED, "Queued", 0);
             activeBySha.put(sha, job);
             jobsById.put(job.id(), job);
             try {
-                executor.execute(() -> run(job, gh));
+                executor.execute(() -> run(job, analysis, cleanup));
             } catch (RejectedExecutionException e) {
                 activeBySha.remove(sha);
                 jobsById.remove(job.id());
+                cleanup.run();
                 throw new RejectedExecutionException("Server is busy, try again shortly");
             }
             return job.snapshot();
@@ -88,21 +116,30 @@ public class InProcessJobService implements JobService {
         return Optional.ofNullable(jobsById.get(jobId)).map(Job::snapshot);
     }
 
-    private void run(Job job, GithubUrl gh) {
+    private void run(Job job, Analysis analysis, Runnable cleanup) {
         job.start();
         try {
-            pipeline.analyze(gh, job.sha(), job::update);
+            analysis.run(job);
             job.complete();
         } catch (IllegalArgumentException | UnsafeArchiveException | IOException e) {
-            job.fail(e.getMessage());
+            job.fail(Objects.requireNonNullElse(e.getMessage(), "Analysis failed"));
         } catch (Exception e) {
             log.error("Analysis failed for {}", job.sha(), e);
             job.fail("Internal error while analysing the repository");
         } finally {
+            cleanup.run();
             if (!job.isFinished()) job.fail("Analysis terminated unexpectedly");
             synchronized (lock) {
                 activeBySha.remove(job.sha(), job);
             }
+        }
+    }
+
+    private static void deleteQuietly(Path p) {
+        try {
+            Files.deleteIfExists(p);
+        } catch (IOException ignored) {
+            // best effort: the OS temp folder is cleaned eventually
         }
     }
 

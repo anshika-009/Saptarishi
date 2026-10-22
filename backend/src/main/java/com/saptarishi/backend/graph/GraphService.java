@@ -3,14 +3,21 @@ package com.saptarishi.backend.graph;
 import com.saptarishi.backend.graph.GraphBuilder.Graph;
 import com.saptarishi.backend.ingest.GithubUrl;
 import com.saptarishi.backend.ingest.RepoIngestor;
+import com.saptarishi.backend.ingest.RepoIngestor.IngestResult;
 import com.saptarishi.backend.parse.ParsedFile;
 import com.saptarishi.backend.parse.RepoParser;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GraphService {
+
+    @FunctionalInterface
+    private interface Ingest {
+        IngestResult run() throws IOException;
+    }
 
     private final RepoIngestor ingestor;
     private final RepoParser parser;
@@ -27,7 +34,17 @@ public class GraphService {
 
     public void analyze(GithubUrl gh, String sha, ProgressListener progress) throws IOException {
         progress.update("Downloading repository", 5);
-        var ingested = ingestor.ingest(gh, sha);
+        run(gh.owner(), gh.repo(), sha, () -> ingestor.ingest(gh, sha), progress);
+    }
+
+    public void analyzeUpload(String name, String sha, Path zip, ProgressListener progress) throws IOException {
+        progress.update("Extracting archive", 5);
+        run("upload", name, sha, () -> ingestor.ingestZip(name, sha, zip), progress);
+    }
+
+    private void run(String owner, String repo, String sha, Ingest ingest, ProgressListener progress)
+            throws IOException {
+        var ingested = ingest.run();
 
         int total = Math.max(1, ingested.files().size());
         progress.update("Parsing files", 30);
@@ -36,8 +53,9 @@ public class GraphService {
 
         progress.update("Resolving imports", 88);
         Graph graph = builder.build(parsed, false);
+        if (graph.nodes().isEmpty()) throw new IllegalArgumentException("No supported source files found");
 
         progress.update("Saving graph", 94);
-        repository.save(sha, gh.owner(), gh.repo(), graph, parsed);
+        repository.save(sha, owner, repo, graph, parsed);
     }
 }

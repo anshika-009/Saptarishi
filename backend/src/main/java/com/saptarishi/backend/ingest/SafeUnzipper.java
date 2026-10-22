@@ -45,6 +45,7 @@ public class SafeUnzipper {
                 if (++entries > limits.maxEntries()) throw new UnsafeArchiveException("Too many entries in archive");
 
                 String name = e.getName().replace('\\', '/');
+                if (name.startsWith("__MACOSX/")) continue;
                 String rel = name;
                 if (stripRoot) {
                     int slash = name.indexOf('/');
