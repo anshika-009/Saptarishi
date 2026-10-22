@@ -4,6 +4,7 @@ import com.saptarishi.backend.parse.ParsedFile;
 import com.saptarishi.backend.parse.ParsedFile.RawImport;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,30 @@ public class JavaImportResolver {
             for (String t : resolveOne(imp)) {
                 if (!t.equals(file.path())) targets.add(t); // no self-edges
             }
+        }
+        return targets;
+    }
+
+    /**
+     * Same-package dependencies: Java needs no import for these. A type name the file uses
+     * matches a class in its own package, unless an explicit import of that simple name shadows it.
+     */
+    public Set<String> resolveReferences(ParsedFile file) {
+        Set<String> targets = new LinkedHashSet<>();
+        if (file.typeRefs().isEmpty()) return targets;
+
+        Set<String> shadowed = new HashSet<>();
+        for (RawImport imp : file.imports()) {
+            if (!imp.isStatic() && !imp.isWildcard()) {
+                String n = imp.name();
+                shadowed.add(n.substring(n.lastIndexOf('.') + 1));
+            }
+        }
+        String prefix = file.packageName().isEmpty() ? "" : file.packageName() + ".";
+        for (String name : file.typeRefs()) {
+            if (shadowed.contains(name)) continue;
+            String p = classToPath.get(prefix + name);
+            if (p != null && !p.equals(file.path())) targets.add(p);
         }
         return targets;
     }

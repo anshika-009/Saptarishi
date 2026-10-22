@@ -12,7 +12,14 @@ public record ParsedFile(
         int tokens,
         int complexity,
         int loc,                     // non-blank lines
-        boolean parsed) {            // false = broken file, kept as a plain node
+        boolean parsed,              // false = broken file, kept as a plain node
+        List<String> typeRefs) {     // simple type names this file uses (Java: for same-package edges)
+
+    /** Old shape, so existing callers and tests keep compiling. */
+    public ParsedFile(String path, String language, String packageName, List<RawImport> imports,
+                      List<Symbol> symbols, int tokens, int complexity, int loc, boolean parsed) {
+        this(path, language, packageName, imports, symbols, tokens, complexity, loc, parsed, List.of());
+    }
 
     public record RawImport(String name, boolean isStatic, boolean isWildcard) {}
 

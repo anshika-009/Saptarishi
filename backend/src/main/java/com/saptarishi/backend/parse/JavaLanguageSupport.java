@@ -4,16 +4,16 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ParserConfiguration.LanguageLevel;
-import com.github.javaparser.Token;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.ConditionalExpr;
-import com.github.javaparser.ast.nodeTypes.NodeWithSimpleName;
+import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.stmt.CatchClause;
 import com.github.javaparser.ast.stmt.DoStmt;
 import com.github.javaparser.ast.stmt.ForEachStmt;
@@ -21,8 +21,11 @@ import com.github.javaparser.ast.stmt.ForStmt;
 import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.SwitchEntry;
 import com.github.javaparser.ast.stmt.WhileStmt;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -70,7 +73,7 @@ public class JavaLanguageSupport implements LanguageSupport {
             symbols.sort((a, b) -> Integer.compare(a.line(), b.line()));
 
             return new ParsedFile(path, language(), pkg, imports, symbols,
-                    countTokens(cu), complexity(cu), loc, true);
+                    countTokens(cu), complexity(cu), loc, true, typeRefs(cu));
         } catch (Exception | StackOverflowError e) {
             // One broken file must never fail the whole job.
             return ParsedFile.unparsed(path, language(), loc);
@@ -88,6 +91,21 @@ public class JavaLanguageSupport implements LanguageSupport {
 
     private static int line(Node n) {
         return n.getBegin().map(p -> p.line).orElse(0);
+    }
+
+    /**
+     * Simple names of types this file uses: declared types (fields, params, extends...),
+     * annotations, and capitalised names in expressions (Owner.create(), Color.RED).
+     * Over-collecting is harmless: a name only becomes an edge if a class with that name
+     * exists in the same package.
+     */
+    private static List<String> typeRefs(CompilationUnit cu) {
+        Set<String> names = new TreeSet<>();
+        cu.findAll(ClassOrInterfaceType.class).forEach(t -> names.add(t.getNameAsString()));
+        cu.findAll(AnnotationExpr.class).forEach(a -> names.add(a.getName().getIdentifier()));
+        cu.findAll(NameExpr.class).forEach(n -> names.add(n.getNameAsString()));
+        names.removeIf(n -> n.isEmpty() || !Character.isUpperCase(n.charAt(0)));
+        return List.copyOf(names);
     }
 
     /**

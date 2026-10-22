@@ -13,6 +13,7 @@ public class GraphBuilder {
     /** Same fields the frontend already reads, plus loc and parsed. */
     public record GraphNode(String id, String folder, String language, int complexity,
                             int tokens, int loc, boolean parsed) {}
+    /** type: IMPORT (explicit import) or REFERENCE (same-package use, no import needed). */
     public record GraphEdge(String source, String target, String type) {}
     public record Graph(List<GraphNode> nodes, List<GraphEdge> edges) {}
 
@@ -33,8 +34,14 @@ public class GraphBuilder {
         List<GraphEdge> edges = new ArrayList<>();
         for (ParsedFile f : kept) {
             if (!"java".equals(f.language()) || !f.parsed()) continue;
-            for (String target : java.resolve(f)) {
+            Set<String> imported = java.resolve(f);
+            for (String target : imported) {
                 if (ids.contains(target)) edges.add(new GraphEdge(f.path(), target, "IMPORT"));
+            }
+            for (String target : java.resolveReferences(f)) {
+                if (!imported.contains(target) && ids.contains(target)) {
+                    edges.add(new GraphEdge(f.path(), target, "REFERENCE"));
+                }
             }
         }
         return new Graph(nodes, edges);
