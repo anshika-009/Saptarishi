@@ -8,6 +8,13 @@ import HealthPanel from "./HealthPanel";
 
 cytoscape.use(fcose);
 
+// Green (stable) to red (changed often and complex), for the churn heatmap.
+const heatColor = (h) => {
+  const t = Math.max(0, Math.min(100, h)) / 100;
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  return `rgb(${mix(107, 217)}, ${mix(191, 48)}, ${mix(138, 37)})`;
+};
+
 const OUT = "#2b7bd9";
 const IN = "#2a9d5c";
 const GOD = "#8e24aa";
@@ -79,6 +86,7 @@ const style = [
     selector: "node.god",
     style: { "border-width": 4, "border-color": GOD },
   },
+  { selector: "node.heat", style: { "background-color": "data(heatColor)" } },
   { selector: ".hidden", style: { display: "none" } },
   { selector: ".dim", style: { opacity: 0.1 } },
   {
@@ -149,8 +157,10 @@ export default function Atlas({ sha, onBack }) {
   const [pathFilter, setPathFilter] = useState("");
   const [analysis, setAnalysis] = useState(null); // { cycles, nodes }
   const [showCycles, setShowCycles] = useState(true);
-  const [health, setHealth] = useState(null); // { score, grade, factors, godFiles, ... }
+  const [health, setHealth] = useState(null); // { score, grade, factors, godFiles, ...
   const [showGods, setShowGods] = useState(true);
+  const [showHeat, setShowHeat] = useState(false);
+  const [churn, setChurn] = useState(null); // { available, reason, commitsExamined, files }
   const languages = useMemo(
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
     [data],
@@ -158,6 +168,10 @@ export default function Atlas({ sha, onBack }) {
   const metricsById = useMemo(
     () => new Map((analysis?.nodes ?? []).map((m) => [m.id, m])),
     [analysis],
+  );
+  const heatById = useMemo(
+    () => new Map((churn?.files ?? []).map((f) => [f.path, f])),
+    [churn],
   );
   const godById = useMemo(
     () => new Map((health?.godFiles ?? []).map((g) => [g.id, g])),
@@ -200,7 +214,27 @@ export default function Atlas({ sha, onBack }) {
       .catch((e) => e.name !== "AbortError" && setHealth(null));
     return () => ctrl.abort();
   }, [sha]);
-
+  useEffect(() => {
+    if (!showHeat || churn) return;
+    const ctrl = new AbortController();
+    fetch(`/api/repos/${sha}/churn`, { signal: ctrl.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(setChurn)
+      .catch(
+        (e) =>
+          e.name !== "AbortError" &&
+          setChurn({
+            available: false,
+            reason: "Could not load churn data.",
+            commitsExamined: 0,
+            files: [],
+          }),
+      );
+    return () => ctrl.abort();
+  }, [showHeat, churn, sha]);
   useEffect(() => {
     if (!data) return;
     const { flat, options } = LAYOUTS[layoutName];
@@ -245,7 +279,20 @@ export default function Atlas({ sha, onBack }) {
       }
     });
   }, [analysis, showCycles, data, hideTests, layoutName]);
-
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.batch(() => {
+      cy.nodes().removeClass("heat");
+      if (!showHeat || !churn?.available) return;
+      cy.nodes('[kind = "file"]').forEach((n) => {
+        const f = heatById.get(n.id());
+        if (!f) return;
+        n.data("heatColor", heatColor(f.heat));
+        n.addClass("heat");
+      });
+    });
+  }, [showHeat, churn, heatById, data, hideTests, layoutName]);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -405,6 +452,39 @@ export default function Atlas({ sha, onBack }) {
             <span style={{ color: GOD }}>God files</span> (
             {health ? health.godFiles.length : "…"})
           </label>
+          <label
+            style={{
+              fontSize: 13,
+              background: "#fff",
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: "1px solid #ddd",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showHeat}
+              onChange={(e) => setShowHeat(e.target.checked)}
+            />{" "}
+            Churn heatmap
+            {showHeat && churn === null && " (reading git history…)"}
+          </label>
+          {showHeat && churn && (
+            <span
+              style={{
+                fontSize: 12,
+                background: "#fff",
+                padding: "4px 8px",
+                borderRadius: 4,
+                border: "1px solid #ddd",
+                color: churn.available ? "#555" : "#a15c00",
+              }}
+            >
+              {churn.available
+                ? `green = stable, red = often changed and complex (last ${churn.commitsExamined} commits)`
+                : churn.reason}
+            </span>
+          )}
         </div>
         {error && (
           <p
@@ -438,6 +518,12 @@ export default function Atlas({ sha, onBack }) {
             metrics={metricsById.get(selection.id)}
             cycle={cycleOf.get(selection.id)}
             god={godById.get(selection.id)}
+            heat={
+              showHeat && churn?.available
+                ? heatById.get(selection.id)
+                : undefined
+            }
+            commitsExamined={churn?.commitsExamined}
             onNavigate={navigate}
             onClose={() => setSelection(null)}
           />

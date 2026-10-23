@@ -43,6 +43,8 @@ export default function CodePanel({
   metrics,
   cycle,
   god,
+  heat,
+  commitsExamined,
   onNavigate,
   onClose,
 }) {
@@ -103,6 +105,15 @@ export default function CodePanel({
           <div style={{ fontSize: 12, color: "#a15c00", margin: "4px 0 8px" }}>
             {data.loc} lines · imports and complexity are not analysed for{" "}
             {data.language} yet
+          </div>
+        )}
+        {data && analysed && heat && (
+          <div
+            style={{ fontSize: 12, color: "#c9631f", margin: "0 0 8px" }}
+            title="Heat = how often the file changed x how complex it is, each ranked among the repository's recently changed files"
+          >
+            changed in {heat.commits} of the last {commitsExamined} commits ·
+            heat {heat.heat}/100
           </div>
         )}
         {data && analysed && god && (
