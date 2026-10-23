@@ -218,4 +218,24 @@ class HealthScoreTest {
         var r = HealthScore.of(new Graph(nodes, edges));
         assertTrue(r.godFiles().size() <= Math.ceil(0.05 * r.files()), "found " + r.godFiles().size());
     }
+
+    @Test
+    void filesWithoutAParserAreNotScored() {
+        List<GraphNode> nodes = new ArrayList<>();
+        List<GraphEdge> edges = new ArrayList<>();
+        for (int i = 0; i < 10; i++) nodes.add(node("src/main/F" + i + ".java", 40, 4));
+        for (int i = 0; i < 10; i++) {
+            edges.add(edge("src/main/F" + i + ".java", "src/main/F" + ((i + 1) % 10) + ".java"));
+        }
+        var javaOnly = HealthScore.of(new Graph(nodes, edges));
+
+        List<GraphNode> mixed = new ArrayList<>(nodes);
+        for (int i = 0; i < 40; i++) {
+            mixed.add(new GraphNode("web/c" + i + ".js", "web", "javascript", 0, 0, 100, true));
+        }
+        var withJs = HealthScore.of(new Graph(mixed, edges));
+
+        assertEquals(10, withJs.files());
+        assertEquals(javaOnly.score(), withJs.score());
+    }
 }

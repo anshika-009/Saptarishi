@@ -42,6 +42,12 @@ public final class HealthScore {
 
     /** Largest list of god files returned. */
     static final int MAX_GOD_FILES = 20;
+    /**
+     * Only languages that have a parser are scored. A file without a parser has no complexity and
+     * no import edges, so counting it would make a tangled repo look healthy. Add a language here
+     * when its parser is added.
+     */
+    static final Set<String> SCORED_LANGUAGES = Set.of("java");
 
     public record GodFile(String id, int loc, int complexity, int fanIn, int fanOut,
                           double score, double sizePct, double complexityPct, double connectivityPct) {}
@@ -76,6 +82,7 @@ public final class HealthScore {
 
         List<GraphNode> files = nodes.stream()
                 .filter(GraphNode::parsed)
+                .filter(n -> SCORED_LANGUAGES.contains(n.language()))
                 .filter(n -> !isBoilerplate(n.id()))
                 .toList();
         int n = files.size();
