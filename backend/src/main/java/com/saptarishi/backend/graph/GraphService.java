@@ -1,5 +1,8 @@
 package com.saptarishi.backend.graph;
 
+import com.saptarishi.backend.calls.CallGraph;
+import com.saptarishi.backend.calls.CallGraphBuilder;
+import com.saptarishi.backend.calls.CallRepository;
 import com.saptarishi.backend.graph.GraphBuilder.Graph;
 import com.saptarishi.backend.ingest.GithubUrl;
 import com.saptarishi.backend.ingest.RepoIngestor;
@@ -10,6 +13,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class GraphService {
@@ -23,13 +28,21 @@ public class GraphService {
     private final RepoParser parser;
     private final GraphBuilder builder;
     private final GraphRepository repository;
+    private final CallGraphBuilder callBuilder;
+    private final CallRepository callRepository;
+    private final TransactionTemplate tx;
 
     public GraphService(RepoIngestor ingestor, RepoParser parser,
-                        GraphBuilder builder, GraphRepository repository) {
+                        GraphBuilder builder, GraphRepository repository,
+                        CallGraphBuilder callBuilder, CallRepository callRepository,
+                        PlatformTransactionManager txManager) {
         this.ingestor = ingestor;
         this.parser = parser;
         this.builder = builder;
         this.repository = repository;
+        this.callBuilder = callBuilder;
+        this.callRepository = callRepository;
+        this.tx = new TransactionTemplate(txManager);
     }
 
     public void analyze(GithubUrl gh, String sha, ProgressListener progress) throws IOException {
@@ -56,6 +69,9 @@ public class GraphService {
         if (graph.nodes().isEmpty()) throw new IllegalArgumentException("No supported source files found");
 
         progress.update("Saving graph", 94);
-        repository.save(sha, owner, repo, graph, parsed);
+        CallGraph calls = callBuilder.build(parsed);
+        tx.executeWithoutResult(status -> {
+            if (repository.save(sha, owner, repo, graph, parsed)) callRepository.save(sha, calls);
+        });
     }
 }

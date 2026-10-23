@@ -5,6 +5,7 @@ import { toElements } from "./graphUtils";
 import CodePanel from "./CodePanel";
 import SearchBox from "./SearchBox";
 import HealthPanel from "./HealthPanel";
+import CallGraph from "./CallGraph";
 
 cytoscape.use(fcose);
 
@@ -160,6 +161,7 @@ export default function Atlas({ sha, onBack }) {
   const [health, setHealth] = useState(null); // { score, grade, factors, godFiles, ...
   const [showGods, setShowGods] = useState(true);
   const [showHeat, setShowHeat] = useState(false);
+  const [callRoot, setCallRoot] = useState(null); // method id shown in the call graph drawer
   const [churn, setChurn] = useState(null); // { available, reason, commitsExamined, files }
   const languages = useMemo(
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
@@ -353,6 +355,10 @@ export default function Atlas({ sha, onBack }) {
     if (cyRef.current?.getElementById(id).empty()) setHideTests(false);
     setSelection({ id, center: true, line });
   };
+  const openMethod = (m) => {
+    navigate(m.path, m.line);
+    setCallRoot(m.id);
+  };
 
   return (
     <div style={{ display: "flex", width: "100%", height: "100%" }}>
@@ -502,6 +508,14 @@ export default function Atlas({ sha, onBack }) {
         )}
         <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         <HealthPanel health={health} onNavigate={navigate} />
+        {callRoot && (
+          <CallGraph
+            sha={sha}
+            method={callRoot}
+            onOpen={openMethod}
+            onClose={() => setCallRoot(null)}
+          />
+        )}
       </div>
       {selection && (
         <div
@@ -525,6 +539,7 @@ export default function Atlas({ sha, onBack }) {
             }
             commitsExamined={churn?.commitsExamined}
             onNavigate={navigate}
+            onMethod={openMethod}
             onClose={() => setSelection(null)}
           />
         </div>

@@ -36,6 +36,64 @@ function Links({ title, color, items, onNavigate }) {
   );
 }
 
+function Methods({ sha, path, onMethod }) {
+  const [res, setRes] = useState({});
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`/api/repos/${sha}/methods?path=${encodeURIComponent(path)}`, {
+      signal: ctrl.signal,
+    })
+      .then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)),
+      )
+      .then((d) => setRes({ path, ...d }))
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [sha, path]);
+
+  if (res.path !== path) return null;
+  if (!res.available) {
+    return (
+      <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
+        Re-analyse this repository to enable the call graph.
+      </div>
+    );
+  }
+  if (res.methods.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontSize: 12, color: "#6b4eaa", fontWeight: 600 }}>
+        ƒ Methods ({res.methods.length}) · ← callers → callees
+      </div>
+      <div style={{ maxHeight: 110, overflow: "auto" }}>
+        {res.methods.map((m) => (
+          <button
+            key={m.id}
+            title="Show call graph"
+            onClick={() => onMethod({ id: m.id, path, line: m.line })}
+            style={{
+              display: "block",
+              border: 0,
+              background: "none",
+              padding: "1px 0",
+              fontSize: 12,
+              color: "#1a56a0",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            {m.type}.{m.name}({m.arity}){" "}
+            <span style={{ color: "#888" }}>
+              ← {m.callers} → {m.callees}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CodePanel({
   sha,
   path,
@@ -46,6 +104,7 @@ export default function CodePanel({
   heat,
   commitsExamined,
   onNavigate,
+  onMethod,
   onClose,
 }) {
   const [result, setResult] = useState({});
@@ -148,6 +207,9 @@ export default function CodePanel({
               />
             )}
           </>
+        )}
+        {data && analysed && data.language === "java" && (
+          <Methods sha={sha} path={path} onMethod={onMethod} />
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>

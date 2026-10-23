@@ -8,12 +8,24 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.BinaryExpr;
+import com.github.javaparser.ast.expr.CastExpr;
 import com.github.javaparser.ast.expr.ConditionalExpr;
+import com.github.javaparser.ast.expr.EnclosedExpr;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
+import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.expr.SuperExpr;
+import com.github.javaparser.ast.expr.ThisExpr;
 import com.github.javaparser.ast.stmt.CatchClause;
 import com.github.javaparser.ast.stmt.DoStmt;
 import com.github.javaparser.ast.stmt.ForEachStmt;
@@ -22,8 +34,12 @@ import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.SwitchEntry;
 import com.github.javaparser.ast.stmt.WhileStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.github.javaparser.ast.type.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.springframework.stereotype.Component;
@@ -73,11 +89,119 @@ public class JavaLanguageSupport implements LanguageSupport {
             symbols.sort((a, b) -> Integer.compare(a.line(), b.line()));
 
             return new ParsedFile(path, language(), pkg, imports, symbols,
-                    countTokens(cu), complexity(cu), loc, true, typeRefs(cu));
+                    countTokens(cu), complexity(cu), loc, true, typeRefs(cu),
+                    methods(cu), calls(cu));
         } catch (Exception | StackOverflowError e) {
             // One broken file must never fail the whole job.
             return ParsedFile.unparsed(path, language(), loc);
         }
+    }
+
+
+    // ---- call graph facts (resolved later, across files, by CallGraphBuilder) ----
+
+    private record Scope(Map<String, String> locals, Map<String, String> fields) {}
+
+    private static List<ParsedFile.MethodDecl> methods(CompilationUnit cu) {
+        List<ParsedFile.MethodDecl> out = new ArrayList<>();
+        for (CallableDeclaration<?> c : cu.findAll(CallableDeclaration.class)) {
+            out.add(new ParsedFile.MethodDecl(enclosingType(c), c.getNameAsString(),
+                    c.getParameters().size(), line(c), 1 + decisionPoints(c)));
+        }
+        return out;
+    }
+
+    private static List<ParsedFile.CallSite> calls(CompilationUnit cu) {
+        List<ParsedFile.CallSite> out = new ArrayList<>();
+        Map<Node, Scope> scopes = new IdentityHashMap<>();
+
+        for (MethodCallExpr call : cu.findAll(MethodCallExpr.class)) {
+            CallableDeclaration<?> caller = enclosingCallable(call);
+            if (caller == null) continue; // field initialisers, static blocks
+            Scope scope = scopes.computeIfAbsent(caller, k -> scopeOf(caller));
+            Expression target = call.getScope().orElse(null);
+            String receiver = target == null ? "" : typeOf(target, scope);
+            if ("super".equals(receiver)) continue;
+            out.add(new ParsedFile.CallSite(enclosingType(caller), caller.getNameAsString(),
+                    caller.getParameters().size(), call.getNameAsString(),
+                    call.getArguments().size(), receiver));
+        }
+        for (ObjectCreationExpr created : cu.findAll(ObjectCreationExpr.class)) {
+            CallableDeclaration<?> caller = enclosingCallable(created);
+            if (caller == null) continue;
+            String type = created.getType().getNameAsString();
+            out.add(new ParsedFile.CallSite(enclosingType(caller), caller.getNameAsString(),
+                    caller.getParameters().size(), type, created.getArguments().size(), type));
+        }
+        return out;
+    }
+
+    /** Simple type name of the expression a method is called on, or null when it can't be told cheaply. */
+    private static String typeOf(Expression e, Scope s) {
+        if (e instanceof ThisExpr) return "";
+        if (e instanceof SuperExpr) return "super";
+        if (e instanceof EnclosedExpr en) return typeOf(en.getInner(), s);
+        if (e instanceof CastExpr c) {
+            return c.getType().isClassOrInterfaceType()
+                    ? c.getType().asClassOrInterfaceType().getNameAsString() : null;
+        }
+        if (e instanceof ObjectCreationExpr o) return o.getType().getNameAsString();
+        if (e instanceof NameExpr n) {
+            String id = n.getNameAsString();
+            String t = s.locals().get(id);
+            if (t == null) t = s.fields().get(id);
+            if (t != null) return t;
+            return Character.isUpperCase(id.charAt(0)) ? id : null; // Util.trim(): static call
+        }
+        if (e instanceof FieldAccessExpr f) {
+            String id = f.getNameAsString();
+            if (f.getScope() instanceof ThisExpr) return s.fields().get(id);
+            return Character.isUpperCase(id.charAt(0)) ? id : null; // pkg.Util.trim()
+        }
+        return null; // chained call, array access, ...
+    }
+
+    private static Scope scopeOf(CallableDeclaration<?> c) {
+        Map<String, String> locals = new HashMap<>();
+        for (Parameter p : c.getParameters()) putType(locals, p.getNameAsString(), p.getType());
+        for (VariableDeclarator v : c.findAll(VariableDeclarator.class)) {
+            if (v.getType().isVarType()) {
+                v.getInitializer().filter(i -> i instanceof ObjectCreationExpr).ifPresent(i ->
+                        locals.putIfAbsent(v.getNameAsString(),
+                                ((ObjectCreationExpr) i).getType().getNameAsString()));
+            } else {
+                putType(locals, v.getNameAsString(), v.getType());
+            }
+        }
+        Map<String, String> fields = new HashMap<>();
+        for (Node n = c.getParentNode().orElse(null); n != null; n = n.getParentNode().orElse(null)) {
+            if (!(n instanceof TypeDeclaration<?> t)) continue;
+            for (FieldDeclaration f : t.getFields()) {
+                for (VariableDeclarator v : f.getVariables()) putType(fields, v.getNameAsString(), v.getType());
+            }
+            if (t instanceof RecordDeclaration r) {
+                for (Parameter rp : r.getParameters()) putType(fields, rp.getNameAsString(), rp.getType());
+            }
+        }
+        return new Scope(locals, fields);
+    }
+
+    private static void putType(Map<String, String> m, String name, Type t) {
+        if (t.isClassOrInterfaceType()) m.putIfAbsent(name, t.asClassOrInterfaceType().getNameAsString());
+    }
+
+    private static CallableDeclaration<?> enclosingCallable(Node n) {
+        for (Node p = n.getParentNode().orElse(null); p != null; p = p.getParentNode().orElse(null)) {
+            if (p instanceof CallableDeclaration<?> c) return c;
+        }
+        return null;
+    }
+
+    private static String enclosingType(Node n) {
+        for (Node p = n.getParentNode().orElse(null); p != null; p = p.getParentNode().orElse(null)) {
+            if (p instanceof TypeDeclaration<?> t) return t.getNameAsString();
+        }
+        return "";
     }
 
     private static String typeKind(TypeDeclaration<?> t) {
