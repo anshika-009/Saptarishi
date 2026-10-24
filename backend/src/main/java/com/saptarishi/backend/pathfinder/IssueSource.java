@@ -41,7 +41,7 @@ public class IssueSource {
 
     public List<Issue> fetch(String owner, String repo) throws IOException {
         String q = "repo:" + owner + "/" + repo
-                + " is:issue is:open no:assignee label:\"good first issue\",\"good-first-issue\",\"help wanted\"";
+                + " is:issue is:open no:assignee label:\"good first issue\",\"good-first-issue\",\"help wanted\", beginner";
         Map<String, Object> body;
         try {
             body = http.get()

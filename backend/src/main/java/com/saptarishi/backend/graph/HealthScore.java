@@ -47,7 +47,7 @@ public final class HealthScore {
      * no import edges, so counting it would make a tangled repo look healthy. Add a language here
      * when its parser is added.
      */
-    static final Set<String> SCORED_LANGUAGES = Set.of("java");
+    public static final Set<String> SCORED_LANGUAGES = Set.of("java");
 
     public record GodFile(String id, int loc, int complexity, int fanIn, int fanOut,
                           double score, double sizePct, double complexityPct, double connectivityPct) {}
@@ -176,12 +176,12 @@ public final class HealthScore {
     }
 
     /** Anything under a test/ or tests/ folder (src/test/java, test/, ...). */
-    static boolean isTestPath(String id) {
+    public static boolean isTestPath(String id) {
         return ("/" + id).matches(".*/tests?/.*");
     }
 
     /** Files that carry no logic and would only distort the percentiles. */
-    static boolean isBoilerplate(String id) {
+    public static boolean isBoilerplate(String id) {
         return id.endsWith("package-info.java") || id.endsWith("module-info.java");
     }
 

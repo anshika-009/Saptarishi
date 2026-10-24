@@ -6,6 +6,7 @@ import CodePanel from "./CodePanel";
 import SearchBox from "./SearchBox";
 import HealthPanel from "./HealthPanel";
 import CallGraph from "./CallGraph";
+import PathfinderPanel from "./PathfinderPanel";
 
 cytoscape.use(fcose);
 
@@ -161,6 +162,7 @@ export default function Atlas({ sha, onBack }) {
   const [health, setHealth] = useState(null); // { score, grade, factors, godFiles, ...
   const [showGods, setShowGods] = useState(true);
   const [showHeat, setShowHeat] = useState(false);
+  const [showPath, setShowPath] = useState(false); // onboarding pathfinder drawer
   const [callRoot, setCallRoot] = useState(null); // method id shown in the call graph drawer
   const [churn, setChurn] = useState(null); // { available, reason, commitsExamined, files }
   const languages = useMemo(
@@ -491,6 +493,9 @@ export default function Atlas({ sha, onBack }) {
                 : churn.reason}
             </span>
           )}
+          <button onClick={() => setShowPath((v) => !v)}>
+            {showPath ? "Hide onboarding" : "Where to start"}
+          </button>
         </div>
         {error && (
           <p
@@ -508,6 +513,13 @@ export default function Atlas({ sha, onBack }) {
         )}
         <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         <HealthPanel health={health} onNavigate={navigate} />
+        {showPath && (
+          <PathfinderPanel
+            sha={sha}
+            onNavigate={navigate}
+            onClose={() => setShowPath(false)}
+          />
+        )}
         {callRoot && (
           <CallGraph
             sha={sha}

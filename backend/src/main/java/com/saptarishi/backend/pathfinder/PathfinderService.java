@@ -1,6 +1,9 @@
 package com.saptarishi.backend.pathfinder;
 
+import com.saptarishi.backend.graph.GraphBuilder.Graph;
 import com.saptarishi.backend.graph.GraphBuilder.GraphEdge;
+import com.saptarishi.backend.graph.GraphRepository;
+import com.saptarishi.backend.graph.HealthScore;
 import com.saptarishi.backend.pathfinder.IssueMapper.Confidence;
 import com.saptarishi.backend.pathfinder.IssueSource.Issue;
 import java.io.IOException;
@@ -15,17 +18,25 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PathfinderService {
 
-    public record FileHit(String path, String confidence, String reason, int dependents, int complexity) {}
+    public record FileHit(String path, String confidence, String reason, int dependents, int complexity,
+                          boolean hot) {}
     public record Blast(int dependents, int direct, String level) {}
     public record IssueView(int number, String title, String url, List<String> labels, int comments,
                             String createdAt, String difficulty, Blast blast, List<FileHit> files) {}
-    public record Result(boolean available, String reason, int totalFiles, List<IssueView> issues) {}
+
+    /**
+     * available: GitHub issues could be read. starters: safe first files, present whenever the snapshot
+     * exists, so the feature is useful for uploaded zips and for repos without labelled issues too.
+     */
+    public record Result(boolean available, String reason, int totalFiles, List<IssueView> issues,
+                         List<Starters.Starter> starters) {}
 
     private record Cached(Instant at, Result result) {}
     private record FileRow(String path, int complexity) {}
@@ -36,11 +47,13 @@ public class PathfinderService {
 
     private final JdbcTemplate jdbc;
     private final IssueSource source;
+    private final GraphRepository graphs;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
-    public PathfinderService(JdbcTemplate jdbc, IssueSource source) {
+    public PathfinderService(JdbcTemplate jdbc, IssueSource source, GraphRepository graphs) {
         this.jdbc = jdbc;
         this.source = source;
+        this.graphs = graphs;
     }
 
     /** Empty if the snapshot is unknown. GitHub is asked at most once per commit per 30 minutes. */
@@ -50,28 +63,45 @@ public class PathfinderService {
 
         List<String[]> snapshot = jdbc.query("select owner, repo from repo_snapshot where sha = ?",
                 (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, sha);
-        if (snapshot.isEmpty()) return Optional.empty();
+        Optional<Graph> graph = graphs.load(sha);
+        if (snapshot.isEmpty() || graph.isEmpty()) return Optional.empty();
+
+        // Churn is only used if the heatmap already stored it: this never triggers a git clone.
+        Set<String> hot = Difficulty.hotFiles(loadChurn(sha));
+        Set<String> gods = HealthScore.of(graph.get()).godFiles().stream()
+                .map(HealthScore.GodFile::id).collect(Collectors.toSet());
+        List<Starters.Starter> starters = Starters.pick(graph.get(), gods, hot);
+        int total = graph.get().nodes().size();
+
         String owner = snapshot.get(0)[0];
-        if ("upload".equals(owner)) return Optional.of(unavailable("Uploaded archives have no GitHub issues."));
+        if ("upload".equals(owner)) {
+            return Optional.of(new Result(false, "Uploaded archives have no GitHub issues.", total, List.of(), starters));
+        }
 
         List<Issue> issues;
         try {
             issues = source.fetch(owner, snapshot.get(0)[1]);
         } catch (IOException e) {
-            return Optional.of(unavailable(e.getMessage())); // not cached: retry on the next request
+            // not cached: retry on the next request
+            return Optional.of(new Result(false, e.getMessage(), total, List.of(), starters));
         }
 
-        Result result = rank(sha, issues);
+        Result result = rank(sha, issues, starters, hot);
         if (cache.size() >= MAX_CACHED) cache.clear();
         cache.put(sha, new Cached(Instant.now(), result));
         return Optional.of(result);
     }
 
-    private static Result unavailable(String reason) {
-        return new Result(false, reason, 0, List.of());
+    private Map<String, Integer> loadChurn(String sha) {
+        Map<String, Integer> out = new HashMap<>();
+        List<Map.Entry<String, Integer>> rows = jdbc.query(
+                "select path, commits from file_churn where sha = ?",
+                (rs, i) -> Map.entry(rs.getString(1), rs.getInt(2)), sha);
+        rows.forEach(e -> out.put(e.getKey(), e.getValue()));
+        return out;
     }
 
-    private Result rank(String sha, List<Issue> issues) {
+    private Result rank(String sha, List<Issue> issues, List<Starters.Starter> starters, Set<String> hot) {
         Map<String, Integer> complexity = new HashMap<>();
         for (FileRow r : jdbc.query("select path, complexity from source_file where sha = ?",
                 (rs, i) -> new FileRow(rs.getString(1), rs.getInt(2)), sha)) {
@@ -93,7 +123,8 @@ public class PathfinderService {
             List<IssueMapper.Match> matches = mapper.map(issue.title() + "\n" + issue.body());
             List<FileHit> files = matches.stream()
                     .map(m -> new FileHit(m.path(), m.confidence().name(), m.reason(),
-                            dependents.apply(m.path()).size(), complexity.getOrDefault(m.path(), 0)))
+                            dependents.apply(m.path()).size(), complexity.getOrDefault(m.path(), 0),
+                            hot.contains(m.path())))
                     .toList();
 
             boolean strong = matches.stream().anyMatch(m -> m.confidence() != Confidence.LOW);
@@ -102,15 +133,17 @@ public class PathfinderService {
             Set<String> affected = new HashSet<>();
             int direct = 0;
             int maxComplexity = 0;
+            boolean anyHot = false;
             for (FileHit f : basis) {
                 affected.addAll(dependents.apply(f.path()));
                 direct = Math.max(direct, radius.direct(f.path()));
                 maxComplexity = Math.max(maxComplexity, f.complexity());
+                anyHot |= f.hot();
             }
             basis.forEach(f -> affected.remove(f.path()));
 
             Difficulty.Level level = Difficulty.blast(affected.size(), total);
-            String difficulty = basis.isEmpty() ? "UNKNOWN" : Difficulty.rate(level, maxComplexity);
+            String difficulty = basis.isEmpty() ? "UNKNOWN" : Difficulty.rate(level, maxComplexity, anyHot);
             Blast blast = basis.isEmpty() ? new Blast(0, 0, "UNKNOWN") : new Blast(affected.size(), direct, level.name());
             return new IssueView(issue.number(), issue.title(), issue.url(), issue.labels(), issue.comments(),
                     issue.createdAt(), difficulty, blast, files);
@@ -123,7 +156,7 @@ public class PathfinderService {
                         .thenComparing(Comparator.comparingInt(IssueView::number).reversed()))
                 .limit(MAX_ISSUES)
                 .toList();
-        return new Result(true, null, total, sorted);
+        return new Result(true, null, total, sorted, starters);
     }
 
     private static boolean isBeginnerLabelled(IssueView v) {
