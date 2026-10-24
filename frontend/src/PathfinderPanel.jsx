@@ -210,7 +210,7 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
           padding: "0 12px 8px",
         }}
       >
-        {error && <p style={{ color: "crimson" }}>Could not load: {error}</p>}
+        {error && <p style={{ color: "var(--bad)" }}>Could not load: {error}</p>}
         {!data && !error && (
           <p style={{ color: "var(--mute)" }}>Looking at open issues…</p>
         )}

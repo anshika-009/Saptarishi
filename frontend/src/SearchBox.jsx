@@ -5,7 +5,7 @@ const split = (p) => {
   return [p.slice(i + 1), i < 0 ? "" : p.slice(0, i)];
 };
 
-export default function SearchBox({ sha, onPick }) {
+export default function SearchBox({ sha, onPick, inputRef }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState({ files: [], symbols: [] });
   const [open, setOpen] = useState(false);
@@ -88,6 +88,8 @@ export default function SearchBox({ sha, onPick }) {
   return (
     <div ref={boxRef} style={{ position: "relative" }}>
       <input
+        ref={inputRef}
+        aria-label="Search files and methods"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -95,8 +97,8 @@ export default function SearchBox({ sha, onPick }) {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder="Search files and symbols…"
-        style={{ width: 260, padding: "5px 8px" }}
+        placeholder="Search files or methods…  ( / )"
+        style={{ width: 280 }}
       />
       {open && items.length > 0 && (
         <div

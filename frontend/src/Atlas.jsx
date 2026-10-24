@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { toElements } from "./graphUtils";
+import { toElements, isTest } from "./graphUtils";
 import CodePanel from "./CodePanel";
 import SearchBox from "./SearchBox";
 import HealthPanel from "./HealthPanel";
@@ -9,6 +9,34 @@ import CallGraph from "./CallGraph";
 import Logo from "./Logo";
 import { C, heatColor } from "./Theme";
 import PathfinderPanel from "./PathfinderPanel";
+import Guide from "./Guide";
+import CyclePanel from "./CyclePanel";
+
+function Chip({ on, onChange, children, title, swatch }) {
+  return (
+    <button
+      type="button"
+      className="chip"
+      aria-pressed={on}
+      title={title}
+      onClick={() => onChange(!on)}
+    >
+      {swatch && <i className={`sw ${swatch}`} />}
+      {children}
+    </button>
+  );
+}
+
+function Lg({ sw, children }) {
+  return (
+    <div className="lg">
+      <span>
+        <i className={`sw ${sw}`} />
+      </span>
+      <span>{children}</span>
+    </div>
+  );
+}
 
 cytoscape.use(fcose);
 
@@ -161,10 +189,47 @@ export default function Atlas({ sha, onBack }) {
   const [showPath, setShowPath] = useState(false); // onboarding pathfinder drawer
   const [callRoot, setCallRoot] = useState(null); // method id shown in the call graph drawer
   const [churn, setChurn] = useState(null); // { available, reason, commitsExamined, files }
+  const searchRef = useRef(null);
+  const focusRef = useRef(null);
+  const [focusTick, setFocusTick] = useState(0);
+  const [showCycleList, setShowCycleList] = useState(false);
+  const [guide, setGuide] = useState(() => {
+    try {
+      return !localStorage.getItem("saptarishi-guide");
+    } catch {
+      return false;
+    }
+  });
+  const [hint, setHint] = useState(true);
+  const [legend, setLegend] = useState(false);
+  const [hover, setHover] = useState(null); // { id, complexity, x, y }
+  const closeGuide = () => {
+    setGuide(false);
+    try {
+      localStorage.setItem("saptarishi-guide", "1");
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const languages = useMemo(
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
     [data],
   );
+  const stats = useMemo(() => {
+    if (!data) return null;
+    const by = {};
+    for (const n of data.nodes) by[n.language] = (by[n.language] || 0) + 1;
+    return {
+      by,
+      java: by.java || 0,
+      total: data.nodes.length,
+      edges: data.edges.length,
+    };
+  }, [data]);
+  // Only Java is parsed, so other languages can never have arrows. Hide them by default
+  // (unless there is no Java at all, where hiding would leave an empty map).
+  const [showUnanalysed, setShowUnanalysed] = useState(false);
+  const hideUnanalysed = !showUnanalysed && (stats?.java ?? 0) > 0;
   const metricsById = useMemo(
     () => new Map((analysis?.nodes ?? []).map((m) => [m.id, m])),
     [analysis],
@@ -177,6 +242,16 @@ export default function Atlas({ sha, onBack }) {
     () => new Map((health?.godFiles ?? []).map((g) => [g.id, g])),
     [health],
   );
+  // The map hides test files by default, so count only cycles it can actually show.
+  const cycleCounts = useMemo(() => {
+    const all = analysis?.cycles ?? [];
+    return {
+      all: all.length,
+      prod: all.filter((c) => c.some((p) => !isTest(p))).length,
+    };
+  }, [analysis]);
+  const shownCycles = hideTests ? cycleCounts.prod : cycleCounts.all;
+  const hiddenCycles = hideTests ? cycleCounts.all - cycleCounts.prod : 0;
   const cycleOf = useMemo(() => {
     const map = new Map();
     for (const cycle of analysis?.cycles ?? []) {
@@ -238,7 +313,10 @@ export default function Atlas({ sha, onBack }) {
   useEffect(() => {
     if (!data) return;
     const { flat, options } = LAYOUTS[layoutName];
-    let elements = toElements(data, { hideTests });
+    let elements = toElements(data, {
+      hideTests,
+      analysedOnly: hideUnanalysed,
+    });
     if (flat) {
       elements = elements
         .filter((e) => e.data.kind !== "folder")
@@ -250,16 +328,33 @@ export default function Atlas({ sha, onBack }) {
       style,
       layout: options,
     });
-    cy.on("tap", 'node[kind = "file"]', (evt) =>
-      setSelection({ id: evt.target.id(), center: false, line: null }),
-    );
+    cy.on("tap", 'node[kind = "file"]', (evt) => {
+      setHint(false);
+      setHover(null);
+      setSelection({ id: evt.target.id(), center: false, line: null });
+    });
+    cy.on("mouseover", 'node[kind = "file"]', (evt) => {
+      const n = evt.target;
+      setHover({
+        id: n.id(),
+        complexity: n.data("complexity"),
+        x: n.renderedPosition().x,
+        y: n.renderedBoundingBox().y1,
+      });
+      if (containerRef.current) containerRef.current.style.cursor = "pointer";
+    });
+    cy.on("mouseout", 'node[kind = "file"]', () => {
+      setHover(null);
+      if (containerRef.current) containerRef.current.style.cursor = "";
+    });
+    cy.on("pan zoom", () => setHover(null));
     cy.on("tap", (evt) => evt.target === cy && setSelection(null));
     cyRef.current = cy;
     return () => {
       cy.destroy();
       cyRef.current = null;
     };
-  }, [data, hideTests, layoutName]);
+  }, [data, hideTests, layoutName, hideUnanalysed]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -278,7 +373,7 @@ export default function Atlas({ sha, onBack }) {
           .addClass("cyc");
       }
     });
-  }, [analysis, showCycles, data, hideTests, layoutName]);
+  }, [analysis, showCycles, data, hideTests, layoutName, hideUnanalysed]);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -292,7 +387,7 @@ export default function Atlas({ sha, onBack }) {
         n.addClass("heat");
       });
     });
-  }, [showHeat, churn, heatById, data, hideTests, layoutName]);
+  }, [showHeat, churn, heatById, data, hideTests, layoutName, hideUnanalysed]);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -301,7 +396,7 @@ export default function Atlas({ sha, onBack }) {
       if (!showGods || !health) return;
       for (const g of health.godFiles) cy.getElementById(g.id).addClass("god");
     });
-  }, [health, showGods, data, hideTests, layoutName]);
+  }, [health, showGods, data, hideTests, layoutName, hideUnanalysed]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -322,7 +417,7 @@ export default function Atlas({ sha, onBack }) {
         { duration: 300 },
       );
     }
-  }, [selection, data, hideTests, layoutName]);
+  }, [selection, data, hideTests, layoutName, hideUnanalysed]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -342,15 +437,60 @@ export default function Atlas({ sha, onBack }) {
           folder.addClass("hidden");
       });
     });
-  }, [lang, pathFilter, data, hideTests, layoutName]);
+  }, [lang, pathFilter, data, hideTests, layoutName, hideUnanalysed]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    const ids = focusRef.current;
+    if (!cy || !ids) return;
+    const els = cy.nodes().filter((n) => ids.includes(n.id()));
+    if (els.empty()) return;
+    focusRef.current = null;
+    cy.animate({ fit: { eles: els, padding: 120 } }, { duration: 300 });
+  }, [focusTick, data, hideTests, layoutName, hideUnanalysed]);
 
   const panelOpen = selection !== null;
   useEffect(() => {
     cyRef.current?.resize();
   }, [panelOpen]);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+      if (e.metaKey || e.ctrlKey) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "?") setGuide(true);
+      else if (e.key === "Escape") setSelection(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const focusCycle = (ids) => {
+    setShowCycles(true);
+    if (hideTests && ids.some(isTest)) setHideTests(false);
+    focusRef.current = ids;
+    setFocusTick((t) => t + 1);
+  };
+
+  const zoomBy = (f) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.zoom({
+      level: cy.zoom() * f,
+      renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+    });
+  };
+  const fit = () => cyRef.current?.fit(undefined, 40);
+
   const navigate = (id, line = null) => {
-    if (cyRef.current?.getElementById(id).empty()) setHideTests(false);
+    setHint(false);
+    if (cyRef.current?.getElementById(id).empty()) {
+      setHideTests(false);
+      setShowUnanalysed(true);
+    }
     setSelection({ id, center: true, line });
   };
   const openMethod = (m) => {
@@ -370,18 +510,90 @@ export default function Atlas({ sha, onBack }) {
           <Logo size={26} />
           <span>Saptarishi</span>
         </button>
-        <SearchBox sha={sha} onPick={navigate} />
-        <select
-          value={layoutName}
-          onChange={(e) => setLayoutName(e.target.value)}
-        >
+        <SearchBox sha={sha} onPick={navigate} inputRef={searchRef} />
+        <div className="seg" role="group" aria-label="Layout">
           {Object.entries(LAYOUTS).map(([key, l]) => (
-            <option key={key} value={key}>
-              {l.label}
-            </option>
+            <button
+              key={key}
+              type="button"
+              aria-pressed={layoutName === key}
+              title={l.label}
+              onClick={() => setLayoutName(key)}
+            >
+              {l.label.split(" (")[0]}
+            </button>
           ))}
-        </select>
-        <select value={lang} onChange={(e) => setLang(e.target.value)}>
+        </div>
+        <span className="spacer" />
+        <span className="sha" title={`Commit ${sha}`}>
+          commit {sha.slice(0, 7)}
+        </span>
+        <button
+          className="primary"
+          onClick={() => {
+            setShowCycleList(false);
+            setShowPath((v) => !v);
+          }}
+        >
+          {showPath ? "Hide suggestions" : "Where to start"}
+        </button>
+        <button
+          className="icon-btn"
+          onClick={() => setGuide(true)}
+          aria-label="How to use this map"
+          title="How to use this map (?)"
+        >
+          ?
+        </button>
+      </header>
+      <div className="lensbar">
+        <span className="lens-label">Highlight</span>
+        <Chip
+          on={showCycles}
+          onChange={setShowCycles}
+          swatch="cyc"
+          title="Files that import each other in a loop. Hard to change or test in isolation."
+        >
+          Circular imports ({analysis ? shownCycles : "…"}
+          {hiddenCycles > 0 ? ` · +${hiddenCycles} in tests` : ""})
+        </Chip>
+        {cycleCounts.all > 0 && (
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={showCycleList}
+            title="List every circular import and the files in it"
+            onClick={() => {
+              setShowPath(false);
+              setShowCycleList((v) => !v);
+            }}
+          >
+            See where
+          </button>
+        )}
+        <Chip
+          on={showGods}
+          onChange={setShowGods}
+          swatch="god"
+          title="Files in the top 5% for size, complexity and connections at once. The riskiest to change."
+        >
+          God files ({health ? health.godFiles.length : "…"})
+        </Chip>
+        <Chip
+          on={showHeat}
+          onChange={setShowHeat}
+          swatch="heat"
+          title="Colour files by how often they change and how complex they are (reads git history)."
+        >
+          Churn heat{showHeat && churn === null ? " (loading…)" : ""}
+        </Chip>
+        <span className="vsep" />
+        <span className="lens-label">Filter</span>
+        <select
+          value={lang}
+          onChange={(e) => setLang(e.target.value)}
+          aria-label="Language"
+        >
           <option value="all">All languages</option>
           {languages.map((l) => (
             <option key={l} value={l}>
@@ -392,96 +604,63 @@ export default function Atlas({ sha, onBack }) {
         <input
           value={pathFilter}
           onChange={(e) => setPathFilter(e.target.value)}
-          placeholder="Filter by path…"
-          style={{ width: 130, padding: "5px 8px" }}
+          placeholder="Path contains… e.g. controller"
+          aria-label="Filter files by path"
+          style={{ width: 200 }}
         />
-        <label
-          style={{
-            fontSize: 13,
-            background: "var(--surface)",
-            padding: "4px 8px",
-            borderRadius: 8,
-            border: "1px solid var(--line)",
-          }}
+        <Chip
+          on={!hideTests}
+          onChange={(v) => setHideTests(!v)}
+          title="Include files under test/ folders"
         >
-          <input
-            type="checkbox"
-            checked={!hideTests}
-            onChange={(e) => setHideTests(!e.target.checked)}
-          />{" "}
           Show tests
-        </label>
-        <label
-          style={{
-            fontSize: 13,
-            background: "var(--surface)",
-            padding: "4px 8px",
-            borderRadius: 8,
-            border: "1px solid var(--line)",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={showCycles}
-            onChange={(e) => setShowCycles(e.target.checked)}
-          />{" "}
-          Circular imports ({analysis ? analysis.cycles.length : "…"})
-        </label>
-        <label
-          style={{
-            fontSize: 13,
-            background: "var(--surface)",
-            padding: "4px 8px",
-            borderRadius: 8,
-            border: "1px solid var(--line)",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={showGods}
-            onChange={(e) => setShowGods(e.target.checked)}
-          />{" "}
-          <span style={{ color: GOD }}>God files</span> (
-          {health ? health.godFiles.length : "…"})
-        </label>
-        <label
-          style={{
-            fontSize: 13,
-            background: "var(--surface)",
-            padding: "4px 8px",
-            borderRadius: 8,
-            border: "1px solid var(--line)",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={showHeat}
-            onChange={(e) => setShowHeat(e.target.checked)}
-          />{" "}
-          Churn heatmap
-          {showHeat && churn === null && " (reading git history…)"}
-        </label>
-        {showHeat && churn && (
-          <span
-            style={{
-              fontSize: 12,
-              background: "var(--surface)",
-              padding: "4px 8px",
-              borderRadius: 8,
-              border: "1px solid var(--line)",
-              color: churn.available ? "var(--mute)" : "var(--warn-text)",
+        </Chip>
+        {(lang !== "all" || pathFilter) && (
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              setLang("all");
+              setPathFilter("");
             }}
           >
-            {churn.available
-              ? `pale = stable, deep red = changed often and complex (last ${churn.commitsExamined} commits)`
-              : churn.reason}
-          </span>
+            Clear filters
+          </button>
         )}
-        <span className="spacer" />
-        <button className="primary" onClick={() => setShowPath((v) => !v)}>
-          {showPath ? "Hide onboarding" : "Where to start"}
-        </button>
-      </header>
+      </div>
+      {stats && stats.java < stats.total && (
+        <div className="notice" role="note">
+          <span>
+            {stats.java === 0
+              ? "No Java files were found, so there are no dependency arrows. Saptarishi only analyses Java for now; "
+              : `Only Java files get dependency arrows. ${stats.total - stats.java} of ${stats.total} files are other languages (`}
+            {Object.entries(stats.by)
+              .filter(([l]) => l !== "java")
+              .sort((x, y) => y[1] - x[1])
+              .slice(0, 3)
+              .map(([l, c]) => `${l} ${c}`)
+              .join(", ")}
+            {stats.java === 0
+              ? " are shown as unconnected dots."
+              : hideUnanalysed
+                ? "), so they are hidden."
+                : "), shown here as unconnected dots."}
+          </span>
+          {stats.java > 0 && (
+            <button type="button" onClick={() => setShowUnanalysed((v) => !v)}>
+              {hideUnanalysed ? "Show them" : "Hide them"}
+            </button>
+          )}
+        </div>
+      )}
+      {stats && stats.java > 0 && stats.edges === 0 && (
+        <div className="notice" role="alert">
+          <span>
+            {stats.java} Java files were found but no imports between them could
+            be matched to files in this repository, so there are no arrows.
+          </span>
+        </div>
+      )}
       <div className="atlas-body">
         <div className="canvas-wrap">
           {error && (
@@ -491,7 +670,7 @@ export default function Atlas({ sha, onBack }) {
                 top: 8,
                 right: 8,
                 zIndex: 1,
-                color: "crimson",
+                color: "var(--bad)",
                 margin: 0,
               }}
             >
@@ -499,7 +678,99 @@ export default function Atlas({ sha, onBack }) {
             </p>
           )}
           <div ref={containerRef} className="graph" />
+          {!data && !error && (
+            <div className="loading" role="status">
+              <span className="spinner" />
+              Drawing the map…
+            </div>
+          )}
+          {data && hint && !selection && (
+            <div className="hint" role="note">
+              <span>
+                Click any file to see what it uses and what uses it. Scroll to
+                zoom, drag to pan.
+              </span>
+              <button onClick={() => setHint(false)} aria-label="Dismiss tip">
+                ×
+              </button>
+            </div>
+          )}
+          {hover && (
+            <div className="tip" style={{ left: hover.x, top: hover.y }}>
+              {hover.id.split("/").pop()}
+              <small>complexity {hover.complexity} · click to open</small>
+            </div>
+          )}
+          <div className="overlay-tl">
+            <div className="zoom">
+              <button
+                onClick={() => zoomBy(1.25)}
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                +
+              </button>
+              <button
+                onClick={() => zoomBy(0.8)}
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                −
+              </button>
+              <button
+                onClick={fit}
+                aria-label="Fit to screen"
+                title="Fit to screen"
+              >
+                ⤢
+              </button>
+            </div>
+            <button
+              className="legend-toggle"
+              aria-expanded={legend}
+              onClick={() => setLegend((v) => !v)}
+            >
+              Legend {legend ? "▾" : "▸"}
+            </button>
+            {legend && (
+              <div className="legend">
+                <Lg sw="dot">File. Bigger = more complex.</Lg>
+                <Lg sw="box">Folder.</Lg>
+                <Lg sw="out">
+                  Arrow: A imports B. Selected file: black = it uses, red = uses
+                  it.
+                </Lg>
+                {showCycles && <Lg sw="cyc">Circular import loop.</Lg>}
+                {showGods && (
+                  <Lg sw="god">God file: big, complex, widely connected.</Lg>
+                )}
+                {showHeat && (
+                  <>
+                    <Lg sw="heat">
+                      Pale = stable, deep red = changes often and complex.
+                    </Lg>
+                    {churn && (
+                      <div className="legend-note">
+                        {churn.available
+                          ? `Based on the last ${churn.commitsExamined} commits.`
+                          : churn.reason}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <HealthPanel health={health} onNavigate={navigate} />
+          {showCycleList && analysis && (
+            <CyclePanel
+              cycles={analysis.cycles}
+              edges={data?.edges ?? []}
+              onFocus={focusCycle}
+              onOpen={navigate}
+              onClose={() => setShowCycleList(false)}
+            />
+          )}
           {showPath && (
             <PathfinderPanel
               sha={sha}
@@ -538,6 +809,7 @@ export default function Atlas({ sha, onBack }) {
           </aside>
         )}
       </div>
+      {guide && <Guide onClose={closeGuide} />}
     </div>
   );
 }

@@ -2,6 +2,27 @@ import { useEffect, useRef, useState } from "react";
 import Logo from "./Logo";
 
 const MAX_MB = 100;
+const GITHUB_RE = /^(https?:\/\/)?(www\.)?github\.com\/[\w.-]+\/[\w.-]+/i;
+
+const EXAMPLES = [
+  ["spring-petclinic", "https://github.com/spring-projects/spring-petclinic"],
+  ["gson", "https://github.com/google/gson"],
+  ["commons-lang", "https://github.com/apache/commons-lang"],
+];
+
+const STEPS = [
+  ["Paste a repository", "A public GitHub link, or a .zip of your own project."],
+  ["Give it a moment", "Every Java file is read and its imports are traced."],
+  ["Explore the map", "Click files, spot risky areas, find where to begin."],
+];
+
+const LENSES = [
+  ["Dependency map", "Every file is a dot, every import an arrow. See what depends on what."],
+  ["Health score", "A 0 to 100 grade, with the exact reasons points were lost."],
+  ["Risk hot spots", "Circular imports, oversized “god files” and code that changes often."],
+  ["Call graph", "Pick a method to see who calls it and what it calls."],
+  ["Where to start", "Open issues matched to files, plus low-risk files for newcomers."],
+];
 
 async function readJson(res) {
   const body = await res.json().catch(() => ({}));
@@ -14,9 +35,7 @@ async function readJson(res) {
 }
 
 export default function Home({ onReady }) {
-  const [url, setUrl] = useState(
-    "https://github.com/spring-projects/spring-petclinic",
-  );
+  const [url, setUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null);
@@ -79,15 +98,31 @@ export default function Home({ onReady }) {
     }
   };
 
-  const submitUrl = (e) => {
-    e.preventDefault();
+  const runUrl = (value) => {
+    const u = value.trim();
+    if (!GITHUB_RE.test(u)) {
+      setError(
+        "That doesn't look like a GitHub repository link. Try https://github.com/owner/repo",
+      );
+      return;
+    }
     start("Contacting GitHub…", () =>
       fetch("/api/repos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: u }),
       }),
     );
+  };
+
+  const submitUrl = (e) => {
+    e.preventDefault();
+    runUrl(url);
+  };
+
+  const tryExample = (u) => {
+    setUrl(u);
+    runUrl(u);
   };
 
   const submitFile = (file) => {
@@ -116,7 +151,19 @@ export default function Home({ onReady }) {
         </p>
       </div>
 
-      <section className="card">
+      <ol className="steps">
+        {STEPS.map(([title, text], i) => (
+          <li key={title}>
+            <span className="num">{i + 1}</span>
+            <div>
+              <strong>{title}</strong>
+              <span>{text}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <section className="card entry">
         <label className="field-label" htmlFor="repo-url">
           GitHub repository
         </label>
@@ -124,16 +171,33 @@ export default function Home({ onReady }) {
           <input
             id="repo-url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setError(null);
+            }}
             placeholder="https://github.com/owner/repo"
             disabled={busy}
+            autoFocus
           />
           <button type="submit" disabled={busy || !url.trim()}>
             Analyse
           </button>
         </form>
+        <div className="examples">
+          <span>No repo handy? Try</span>
+          {EXAMPLES.map(([label, u]) => (
+            <button
+              key={label}
+              type="button"
+              disabled={busy}
+              onClick={() => tryExample(u)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-        <div className="or">or</div>
+        <div className="or">or analyse your own code</div>
 
         <div
           role="button"
@@ -169,13 +233,17 @@ export default function Home({ onReady }) {
         </div>
 
         {status && (
-          <div className="progress-box">
+          <div className="progress-box" role="status" aria-live="polite">
             <progress value={status.progress ?? undefined} max={100} />
             <div>
               {status.progress == null
                 ? status.stage
                 : `${status.stage} (${status.progress}%)`}
             </div>
+            <small>
+              Large projects can take a minute. Your code is only read, never
+              changed.
+            </small>
           </div>
         )}
         {error && (
@@ -183,13 +251,19 @@ export default function Home({ onReady }) {
             {error}
           </p>
         )}
+        <p className="fineprint">
+          Java projects only for now · public GitHub repositories only
+        </p>
       </section>
 
-      <ul className="features">
-        <li>Dependency map</li>
-        <li>Churn × complexity heat</li>
-        <li>Call graph</li>
-        <li>Where to start</li>
+      <h2 className="section-title">What you’ll be able to do</h2>
+      <ul className="lens-grid">
+        {LENSES.map(([title, text]) => (
+          <li key={title}>
+            <strong>{title}</strong>
+            <span>{text}</span>
+          </li>
+        ))}
       </ul>
     </main>
   );

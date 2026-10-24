@@ -177,7 +177,7 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
           <p style={{ padding: 12, color: "var(--mute)" }}>Loading…</p>
         )}
         {error && (
-          <p style={{ padding: 12, color: "crimson" }}>
+          <p style={{ padding: 12, color: "var(--bad)" }}>
             Could not load calls: {error}
           </p>
         )}

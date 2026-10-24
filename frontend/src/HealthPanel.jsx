@@ -1,13 +1,13 @@
 import { useState } from "react";
 
-const GOD_COLOR = "#8e24aa";
+const GOD_COLOR = "var(--god)";
 
 const GRADE_COLOR = {
-  A: "#2a9d5c",
-  B: "#5c9a2a",
-  C: "#d9822b",
-  D: "#c9631f",
-  F: "#d93025",
+  A: "var(--good)",
+  B: "var(--good2)",
+  C: "var(--warn-text)",
+  D: "var(--accent2)",
+  F: "var(--bad)",
 };
 
 const name = (p) => p.split("/").pop();
@@ -16,7 +16,7 @@ function Bar({ penalty, max }) {
   const lost = max === 0 ? 0 : (penalty / max) * 100;
   return (
     <div
-      style={{ height: 5, background: "#e6e6e6", borderRadius: 3 }}
+      style={{ height: 5, background: "var(--line-soft)", borderRadius: 3 }}
       aria-hidden="true"
     >
       <div
@@ -24,7 +24,7 @@ function Bar({ penalty, max }) {
           width: `${lost}%`,
           height: "100%",
           borderRadius: 3,
-          background: lost >= 66 ? "#d93025" : lost >= 33 ? "#d9822b" : "#9aa0a6",
+          background: lost >= 66 ? "var(--bad)" : lost >= 33 ? "var(--warn)" : "var(--line-strong)",
         }}
       />
     </div>
@@ -39,7 +39,7 @@ export default function HealthPanel({ health, onNavigate }) {
   const [open, setOpen] = useState(false);
   if (!health || health.grade === "n/a") return null;
 
-  const color = GRADE_COLOR[health.grade] ?? "#666";
+  const color = GRADE_COLOR[health.grade] ?? "var(--mute)";
 
   return (
     <div
@@ -49,11 +49,11 @@ export default function HealthPanel({ health, onNavigate }) {
         bottom: 8,
         zIndex: 2,
         width: open ? 300 : "auto",
-        background: "#fff",
-        border: "1px solid #ddd",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
         borderRadius: 6,
         fontSize: 13,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+        boxShadow: "0 1px 4px rgba(23,21,15,0.12)",
       }}
     >
       <button
@@ -77,7 +77,7 @@ export default function HealthPanel({ health, onNavigate }) {
           {health.score}
         </span>
         <span style={{ color, fontWeight: 600 }}>{health.grade}</span>
-        <span style={{ color: "#555", flex: 1 }}>Health</span>
+        <span style={{ color: "var(--mute)", flex: 1 }}>Repo health</span>
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
       </button>
 
@@ -85,22 +85,26 @@ export default function HealthPanel({ health, onNavigate }) {
         <div
           style={{
             padding: "4px 10px 10px",
-            borderTop: "1px solid #eee",
+            borderTop: "1px solid var(--line-soft)",
             maxHeight: "55vh",
             overflow: "auto",
           }}
         >
+          <div style={{ fontSize: 12, color: "var(--mute)", margin: "6px 0 0" }}>
+            Starts at 100 and loses points for tangled imports, oversized
+            files, complexity and coupling. A is 85 and up, F is under 40.
+          </div>
           {health.factors.map((f) => (
             <div key={f.key} style={{ margin: "8px 0" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>{f.label}</span>
-                <span style={{ color: f.penalty ? "#444" : "#2a9d5c" }}>
+                <span style={{ color: f.penalty ? "var(--ink)" : "var(--good)" }}>
                   {f.penalty ? `−${f.penalty}` : "✓"}
-                  <span style={{ color: "#999" }}> / {f.max}</span>
+                  <span style={{ color: "var(--mute)" }}> / {f.max}</span>
                 </span>
               </div>
               <Bar penalty={f.penalty} max={f.max} />
-              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "var(--mute)", marginTop: 2 }}>
                 {f.detail}
               </div>
             </div>
@@ -110,7 +114,7 @@ export default function HealthPanel({ health, onNavigate }) {
             God files ({health.godFiles.length})
           </div>
           {health.godFiles.length === 0 && (
-            <div style={{ fontSize: 12, color: "#666" }}>None found.</div>
+            <div style={{ fontSize: 12, color: "var(--mute)" }}>None found.</div>
           )}
           {health.godFiles.map((g) => (
             <button
@@ -126,7 +130,7 @@ export default function HealthPanel({ health, onNavigate }) {
                 background: "none",
                 padding: "2px 0",
                 fontSize: 12,
-                color: "#1a56a0",
+                color: "var(--link)",
                 cursor: "pointer",
                 textAlign: "left",
               }}
@@ -134,13 +138,13 @@ export default function HealthPanel({ health, onNavigate }) {
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                 {name(g.id)}
               </span>
-              <span style={{ color: "#777", whiteSpace: "nowrap" }}>
+              <span style={{ color: "var(--mute)", whiteSpace: "nowrap" }}>
                 {g.loc} lines · cx {g.complexity}
               </span>
             </button>
           ))}
 
-          <div style={{ fontSize: 11, color: "#888", marginTop: 10, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 11, color: "var(--mute)", marginTop: 10, lineHeight: 1.4 }}>
             A god file is in the top 5% of this repo for size, complexity and
             connections at once. Based on {health.files} source files
             {health.testFilesExcluded > 0

@@ -1,10 +1,17 @@
+// True for anything under a test/ or tests/ folder (mirrors the backend rule).
+export const isTest = (p) => /(^|\/)tests?\//.test(p);
+
 // Converts the API response into Cytoscape elements.
 // Folders become compound nodes. Chains of folders that hold no files and have a
 // single child folder (src/main/java/org/...) are merged into one box.
-export function toElements({ nodes, edges }, { hideTests = true } = {}) {
+export function toElements(
+  { nodes, edges },
+  { hideTests = true, analysedOnly = false } = {},
+) {
   const files = nodes.filter(
     (n) =>
       !n.id.endsWith("package-info.java") &&
+      !(analysedOnly && n.language !== "java") &&
       !(hideTests && /(^|\/)test\//.test(n.id)),
   );
   const ids = new Set(files.map((n) => n.id));

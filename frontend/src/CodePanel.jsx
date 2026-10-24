@@ -65,13 +65,13 @@ function Methods({ sha, path, onMethod }) {
   return (
     <div style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 12, color: "var(--accent2)", fontWeight: 600 }}>
-        ƒ Methods ({res.methods.length}) · ← callers → callees
+        ƒ Methods ({res.methods.length}) · click one for its call graph
       </div>
       <div style={{ maxHeight: 110, overflow: "auto" }}>
         {res.methods.map((m) => (
           <button
             key={m.id}
-            title="Show call graph"
+            title="Show call graph: who calls it and what it calls"
             onClick={() => onMethod({ id: m.id, path, line: m.line })}
             style={{
               display: "block",
@@ -86,13 +86,28 @@ function Methods({ sha, path, onMethod }) {
           >
             {m.type}.{m.name}({m.arity}){" "}
             <span style={{ color: "var(--mute)" }}>
-              ← {m.callers} → {m.callees}
+              {m.callers} callers · calls {m.callees}
             </span>
           </button>
         ))}
       </div>
     </div>
   );
+}
+
+function insight(m, god, cycle) {
+  if (god)
+    return "A god file: big, complex and tied to many others. Changes here are risky.";
+  if (cycle)
+    return "Part of a circular dependency, so it can't be changed or tested in isolation.";
+  if (!m) return null;
+  if (m.blastRadius >= 15)
+    return `Many files rely on this one: a change could ripple to ${m.blastRadius} files.`;
+  if (m.fanIn === 0)
+    return "Nothing imports this file. It is probably an entry point, or unused.";
+  if (m.blastRadius <= 3)
+    return "Low impact: few files depend on it, so it is a safe place to start.";
+  return null;
 }
 
 export default function CodePanel({
@@ -147,26 +162,36 @@ export default function CodePanel({
           >
             {name(path)}
           </strong>
-          <button onClick={onClose} aria-label="Close">
+          <button onClick={onClose} aria-label="Close" title="Close (Esc)">
             ×
           </button>
         </div>
         {data && analysed && (
-          <div
-            style={{ fontSize: 12, color: "var(--mute)", margin: "4px 0 8px" }}
-          >
-            {data.tokens} tokens · complexity {data.complexity} · {data.loc}{" "}
-            lines
+          <div className="tiles">
+            <div className="tile" title="Lines of source code">
+              <b>{data.loc}</b>
+              <span>lines</span>
+            </div>
+            <div className="tile" title="Cyclomatic complexity: roughly the number of decision paths. Higher is harder to follow.">
+              <b>{data.complexity}</b>
+              <span>complexity</span>
+            </div>
+            {metrics && (
+              <>
+                <div className="tile" title="Files that import this one directly">
+                  <b>{metrics.fanIn}</b>
+                  <span>used by</span>
+                </div>
+                <div className="tile" title="Blast radius: files that depend on this one, directly or through other files">
+                  <b>{metrics.blastRadius}</b>
+                  <span>blast radius</span>
+                </div>
+              </>
+            )}
           </div>
         )}
-        {data && analysed && metrics && (
-          <div
-            style={{ fontSize: 12, color: "var(--mute)", margin: "0 0 8px" }}
-            title="Blast radius: files that depend on this one, directly or through other files"
-          >
-            used by {metrics.fanIn} · uses {metrics.fanOut} · blast radius{" "}
-            {metrics.blastRadius}
-          </div>
+        {data && analysed && insight(metrics, god, cycle) && (
+          <p className="insight">{insight(metrics, god, cycle)}</p>
         )}
         {data && !analysed && (
           <div
@@ -201,13 +226,13 @@ export default function CodePanel({
         {data && analysed && (
           <>
             <Links
-              title="→ Imports"
+              title="→ Uses these files"
               color="var(--out)"
               items={data.imports}
               onNavigate={onNavigate}
             />
             <Links
-              title="← Imported by"
+              title="← Used by these files"
               color="var(--in)"
               items={data.importedBy}
               onNavigate={onNavigate}
@@ -227,7 +252,7 @@ export default function CodePanel({
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        {error && <p style={{ color: "crimson", padding: 12 }}>{error}</p>}
+        {error && <p style={{ color: "var(--bad)", padding: 12 }}>{error}</p>}
         {!data && !error && (
           <p style={{ padding: 12, color: "var(--mute)" }}>Loading…</p>
         )}
