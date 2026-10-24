@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Editor from "@monaco-editor/react";
+import { FONT, defineMonaco } from "./Theme";
 
 const name = (p) => p.split("/").pop();
 
@@ -24,7 +25,7 @@ function Links({ title, color, items, onNavigate }) {
               background: "none",
               padding: "1px 0",
               fontSize: 12,
-              color: "#1a56a0",
+              color: "var(--link)",
               cursor: "pointer",
             }}
           >
@@ -55,7 +56,7 @@ function Methods({ sha, path, onMethod }) {
   if (res.path !== path) return null;
   if (!res.available) {
     return (
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
+      <div style={{ fontSize: 12, color: "var(--mute)", marginBottom: 6 }}>
         Re-analyse this repository to enable the call graph.
       </div>
     );
@@ -63,7 +64,7 @@ function Methods({ sha, path, onMethod }) {
   if (res.methods.length === 0) return null;
   return (
     <div style={{ marginBottom: 6 }}>
-      <div style={{ fontSize: 12, color: "#6b4eaa", fontWeight: 600 }}>
+      <div style={{ fontSize: 12, color: "var(--accent2)", fontWeight: 600 }}>
         ƒ Methods ({res.methods.length}) · ← callers → callees
       </div>
       <div style={{ maxHeight: 110, overflow: "auto" }}>
@@ -78,13 +79,13 @@ function Methods({ sha, path, onMethod }) {
               background: "none",
               padding: "1px 0",
               fontSize: 12,
-              color: "#1a56a0",
+              color: "var(--link)",
               cursor: "pointer",
               textAlign: "left",
             }}
           >
             {m.type}.{m.name}({m.arity}){" "}
-            <span style={{ color: "#888" }}>
+            <span style={{ color: "var(--mute)" }}>
               ← {m.callers} → {m.callees}
             </span>
           </button>
@@ -131,7 +132,12 @@ export default function CodePanel({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "8px 12px", borderBottom: "1px solid #eee" }}>
+      <div
+        style={{
+          padding: "8px 12px",
+          borderBottom: "1px solid var(--line-soft)",
+        }}
+      >
         <div
           style={{ display: "flex", justifyContent: "space-between", gap: 8 }}
         >
@@ -146,14 +152,16 @@ export default function CodePanel({
           </button>
         </div>
         {data && analysed && (
-          <div style={{ fontSize: 12, color: "#666", margin: "4px 0 8px" }}>
+          <div
+            style={{ fontSize: 12, color: "var(--mute)", margin: "4px 0 8px" }}
+          >
             {data.tokens} tokens · complexity {data.complexity} · {data.loc}{" "}
             lines
           </div>
         )}
         {data && analysed && metrics && (
           <div
-            style={{ fontSize: 12, color: "#666", margin: "0 0 8px" }}
+            style={{ fontSize: 12, color: "var(--mute)", margin: "0 0 8px" }}
             title="Blast radius: files that depend on this one, directly or through other files"
           >
             used by {metrics.fanIn} · uses {metrics.fanOut} · blast radius{" "}
@@ -161,14 +169,20 @@ export default function CodePanel({
           </div>
         )}
         {data && !analysed && (
-          <div style={{ fontSize: 12, color: "#a15c00", margin: "4px 0 8px" }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--warn-text)",
+              margin: "4px 0 8px",
+            }}
+          >
             {data.loc} lines · imports and complexity are not analysed for{" "}
             {data.language} yet
           </div>
         )}
         {data && analysed && heat && (
           <div
-            style={{ fontSize: 12, color: "#c9631f", margin: "0 0 8px" }}
+            style={{ fontSize: 12, color: "var(--bad)", margin: "0 0 8px" }}
             title="Heat = how often the file changed x how complex it is, each ranked among the repository's recently changed files"
           >
             changed in {heat.commits} of the last {commitsExamined} commits ·
@@ -177,7 +191,7 @@ export default function CodePanel({
         )}
         {data && analysed && god && (
           <div
-            style={{ fontSize: 12, color: "#8e24aa", margin: "0 0 8px" }}
+            style={{ fontSize: 12, color: "var(--god)", margin: "0 0 8px" }}
             title="In the top 5% of this repository for size, complexity and connections at once"
           >
             ⚠ God file · {god.loc} lines, complexity {god.complexity},{" "}
@@ -188,20 +202,20 @@ export default function CodePanel({
           <>
             <Links
               title="→ Imports"
-              color="#2b7bd9"
+              color="var(--out)"
               items={data.imports}
               onNavigate={onNavigate}
             />
             <Links
               title="← Imported by"
-              color="#2a9d5c"
+              color="var(--in)"
               items={data.importedBy}
               onNavigate={onNavigate}
             />
             {cycle && (
               <Links
                 title="⟲ In a circular dependency with"
-                color="#d93025"
+                color="var(--bad)"
                 items={cycle.filter((p) => p !== path)}
                 onNavigate={onNavigate}
               />
@@ -215,10 +229,12 @@ export default function CodePanel({
       <div style={{ flex: 1, minHeight: 0 }}>
         {error && <p style={{ color: "crimson", padding: 12 }}>{error}</p>}
         {!data && !error && (
-          <p style={{ padding: 12, color: "#666" }}>Loading…</p>
+          <p style={{ padding: 12, color: "var(--mute)" }}>Loading…</p>
         )}
         {data && (
           <Editor
+            theme="saptarishi"
+            beforeMount={defineMonaco}
             key={`${path}:${line ?? ""}`}
             path={path}
             language={data.language}
@@ -230,6 +246,8 @@ export default function CodePanel({
             }}
             options={{
               readOnly: true,
+              fontFamily: FONT.mono,
+              renderLineHighlight: "none",
               minimap: { enabled: false },
               fontSize: 12,
               scrollBeyondLastLine: false,
@@ -239,7 +257,13 @@ export default function CodePanel({
         )}
       </div>
       {data?.truncated && (
-        <div style={{ fontSize: 12, color: "#a15c00", padding: "4px 12px" }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--warn-text)",
+            padding: "4px 12px",
+          }}
+        >
           File truncated to the first 512 KB.
         </div>
       )}

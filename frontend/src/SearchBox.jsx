@@ -107,10 +107,10 @@ export default function SearchBox({ sha, onPick }) {
             width: 360,
             maxHeight: 340,
             overflow: "auto",
-            background: "#fff",
-            border: "1px solid #ddd",
-            borderRadius: 4,
-            boxShadow: "0 4px 12px rgba(0,0,0,.12)",
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: 8,
+            boxShadow: "var(--shadow)",
             zIndex: 5,
           }}
         >
@@ -120,7 +120,7 @@ export default function SearchBox({ sha, onPick }) {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#888",
+                    color: "var(--mute)",
                     padding: "6px 10px 2px",
                   }}
                 >
@@ -133,14 +133,14 @@ export default function SearchBox({ sha, onPick }) {
                 style={{
                   padding: "4px 10px",
                   cursor: "pointer",
-                  background: i === active ? "#eef3fb" : "transparent",
+                  background: i === active ? "var(--surface2)" : "transparent",
                 }}
               >
                 <div style={{ fontSize: 13 }}>{it.label}</div>
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#777",
+                    color: "var(--mute)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
 const COLORS = {
-  EASY: "#2a9d5c",
-  MODERATE: "#b9851a",
-  RISKY: "#d93025",
-  UNKNOWN: "#888",
+  EASY: "var(--good)",
+  MODERATE: "var(--warn-text)",
+  RISKY: "var(--bad)",
+  UNKNOWN: "var(--mute)",
 };
 const name = (p) => p.split("/").pop();
 
@@ -15,7 +15,7 @@ function Chip({ text, color, title }) {
       style={{
         fontSize: 11,
         fontWeight: 600,
-        color: "#fff",
+        color: "var(--surface)",
         background: color,
         borderRadius: 10,
         padding: "1px 8px",
@@ -33,12 +33,12 @@ function FileButton({ path, title, suffix, onNavigate }) {
       title={title ?? path}
       onClick={() => onNavigate(path)}
       style={{
-        border: "1px solid #d5dbe3",
-        background: "#f6f8fb",
-        borderRadius: 4,
+        border: "1px solid var(--line)",
+        background: "var(--surface2)",
+        borderRadius: 8,
         padding: "1px 6px",
         fontSize: 12,
-        color: "#1a56a0",
+        color: "var(--link)",
         cursor: "pointer",
       }}
     >
@@ -52,7 +52,9 @@ function IssueCard({ issue, onNavigate }) {
   const color = COLORS[issue.difficulty] ?? COLORS.UNKNOWN;
   const blast = issue.blast;
   return (
-    <div style={{ padding: "8px 0", borderBottom: "1px solid #eee" }}>
+    <div
+      style={{ padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}
+    >
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
         <Chip
           text={issue.difficulty}
@@ -63,19 +65,19 @@ function IssueCard({ issue, onNavigate }) {
           href={issue.url}
           target="_blank"
           rel="noreferrer"
-          style={{ fontSize: 13, color: "#111", fontWeight: 600 }}
+          style={{ fontSize: 13, color: "var(--ink)", fontWeight: 600 }}
         >
           #{issue.number} {issue.title}
         </a>
       </div>
-      <div style={{ fontSize: 11, color: "#777", margin: "3px 0 5px" }}>
+      <div style={{ fontSize: 11, color: "var(--mute)", margin: "3px 0 5px" }}>
         {issue.labels.join(" · ")}
         {issue.comments > 0 && ` · ${issue.comments} comments`}
         {blast.level !== "UNKNOWN" &&
           ` · a change could reach ${blast.dependents} other file${blast.dependents === 1 ? "" : "s"}`}
       </div>
       {issue.files.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#a15c00" }}>
+        <div style={{ fontSize: 12, color: "var(--warn-text)" }}>
           Could not tell which files this issue touches.
         </div>
       ) : (
@@ -85,7 +87,11 @@ function IssueCard({ issue, onNavigate }) {
               key={f.path}
               path={f.path}
               title={`${f.path}\n${f.confidence} confidence: ${f.reason}\n${f.dependents} dependents · complexity ${f.complexity}${f.hot ? " · changed often" : ""}`}
-              suffix={f.confidence === "HIGH" ? "" : ` (${f.confidence.toLowerCase()})`}
+              suffix={
+                f.confidence === "HIGH"
+                  ? ""
+                  : ` (${f.confidence.toLowerCase()})`
+              }
               onNavigate={onNavigate}
             />
           ))}
@@ -97,9 +103,11 @@ function IssueCard({ issue, onNavigate }) {
 
 function StarterRow({ s, onNavigate }) {
   return (
-    <div style={{ padding: "6px 0", borderBottom: "1px solid #eee" }}>
+    <div
+      style={{ padding: "6px 0", borderBottom: "1px solid var(--line-soft)" }}
+    >
       <FileButton path={s.path} onNavigate={onNavigate} />
-      <div style={{ fontSize: 11, color: "#777", marginTop: 2 }}>
+      <div style={{ fontSize: 11, color: "var(--mute)", marginTop: 2 }}>
         {s.path}
         <br />
         used by {s.dependents} · uses {s.uses} · complexity {s.complexity} ·{" "}
@@ -136,7 +144,8 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
       onClick={() => setTab(key)}
       style={{
         border: 0,
-        borderBottom: active === key ? "2px solid #1a56a0" : "2px solid transparent",
+        borderBottom:
+          active === key ? "2px solid var(--link)" : "2px solid transparent",
         background: "none",
         padding: "4px 8px",
         fontWeight: active === key ? 700 : 400,
@@ -151,17 +160,17 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
     <div
       style={{
         position: "absolute",
-        top: 96,
+        top: 12,
         right: 8,
         bottom: 8,
         width: 400,
         zIndex: 3,
         display: "flex",
         flexDirection: "column",
-        background: "#fff",
-        border: "1px solid #ccd3dc",
-        borderRadius: 6,
-        boxShadow: "0 2px 10px rgba(0,0,0,.15)",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 10,
+        boxShadow: "var(--shadow)",
       }}
     >
       <div
@@ -177,26 +186,46 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
           ×
         </button>
       </div>
-      <div style={{ padding: "0 12px", borderBottom: "1px solid #eee" }}>
-        {tabButton("issues", `Issues${data?.available ? ` (${data.issues.length})` : ""}`)}
-        {tabButton("starters", `Safe starter files${data ? ` (${data.starters.length})` : ""}`)}
+      <div
+        style={{
+          padding: "0 12px",
+          borderBottom: "1px solid var(--line-soft)",
+        }}
+      >
+        {tabButton(
+          "issues",
+          `Issues${data?.available ? ` (${data.issues.length})` : ""}`,
+        )}
+        {tabButton(
+          "starters",
+          `Safe starter files${data ? ` (${data.starters.length})` : ""}`,
+        )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "0 12px 8px" }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          padding: "0 12px 8px",
+        }}
+      >
         {error && <p style={{ color: "crimson" }}>Could not load: {error}</p>}
-        {!data && !error && <p style={{ color: "#666" }}>Looking at open issues…</p>}
+        {!data && !error && (
+          <p style={{ color: "var(--mute)" }}>Looking at open issues…</p>
+        )}
 
         {data && active === "issues" && (
           <>
             {!data.available && (
-              <p style={{ fontSize: 13, color: "#a15c00" }}>
+              <p style={{ fontSize: 13, color: "var(--warn-text)" }}>
                 {data.reason} Safe starter files still work, see the other tab.
               </p>
             )}
             {data.available && data.issues.length === 0 && (
-              <p style={{ fontSize: 13, color: "#666" }}>
-                No open &quot;good first issue&quot;, &quot;help wanted&quot; or unassigned issues
-                were found. Try the safe starter files.
+              <p style={{ fontSize: 13, color: "var(--mute)" }}>
+                No open &quot;good first issue&quot;, &quot;help wanted&quot; or
+                unassigned issues were found. Try the safe starter files.
               </p>
             )}
             {data.available &&
@@ -204,9 +233,10 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
                 <IssueCard key={i.number} issue={i} onNavigate={onNavigate} />
               ))}
             {hasIssues && (
-              <p style={{ fontSize: 11, color: "#888" }}>
-                Files are guessed from the issue text (paths, stack frames, class and method
-                names), so check the confidence shown next to each one.
+              <p style={{ fontSize: 11, color: "var(--mute)" }}>
+                Files are guessed from the issue text (paths, stack frames,
+                class and method names), so check the confidence shown next to
+                each one.
               </p>
             )}
           </>
@@ -214,12 +244,12 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
 
         {data && active === "starters" && (
           <>
-            <p style={{ fontSize: 12, color: "#666" }}>
-              Files with some logic but few dependents, outside circular imports,
-              god files and frequently changed code. Safest first.
+            <p style={{ fontSize: 12, color: "var(--mute)" }}>
+              Files with some logic but few dependents, outside circular
+              imports, god files and frequently changed code. Safest first.
             </p>
             {data.starters.length === 0 && (
-              <p style={{ fontSize: 13, color: "#666" }}>
+              <p style={{ fontSize: 13, color: "var(--mute)" }}>
                 No file qualified as a safe starter.
               </p>
             )}

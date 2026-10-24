@@ -1,10 +1,307 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* Beige & Ink. Every colour in the app comes from these variables (Cytoscape and Monaco read theme.js). */
+:root {
+  --bg: #efe8da;
+  --surface: #f8f3e8;
+  --surface2: #e7dfce;
+  --line: #d5cab3;
+  --line-soft: #e3d9c3;
+  --line-strong: #b9ac8f;
+  --ink: #17150f;
+  --mute: #6b6454;
+  --accent: #17150f;
+  --on-accent: #f8f3e8;
+  --accent2: #b4452a;
+  --link: #9c3b22;
+  --out: #17150f;
+  --in: #b4452a;
+  --good: #3f6b3a;
+  --good2: #6e7f2e;
+  --warn: #c9923a;
+  --warn-text: #8a5a12;
+  --bad: #8f2a14;
+  --god: #6b3f69;
+  --radius: 8px;
+  --serif: "Fraunces", Georgia, serif;
+  --sans: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --shadow: 0 1px 2px rgba(23, 21, 15, 0.06), 0 8px 24px rgba(23, 21, 15, 0.12);
+}
+
 html,
 body,
 #root {
   margin: 0;
   width: 100%;
   height: 100%;
-  font-family: system-ui, sans-serif;
-  background: #f7f7f5;
-  color: #222;
+}
+body {
+  font: 13px/1.45 var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+::selection {
+  background: var(--surface2);
+}
+:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 2px;
+}
+
+/* Controls. Buttons that carry an inline style (list links, icon buttons) are left alone. */
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button:not([style]) {
+  height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+button:not([style]):hover:not(:disabled) {
+  background: var(--surface2);
+  border-color: var(--line-strong);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.primary,
+button[type="submit"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+button.primary:hover:not(:disabled),
+button[type="submit"]:hover:not(:disabled) {
+  background: #2e2b22;
+  border-color: #2e2b22;
+}
+input:not([type="checkbox"]):not([type="file"]),
+select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+select {
+  background: var(--surface);
+}
+input::placeholder {
+  color: var(--mute);
+  opacity: 0.85;
+}
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+progress {
+  accent-color: var(--accent);
+  height: 8px;
+  width: 100%;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Home */
+.hero {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 9vh 20px 40px;
+}
+.hero-head {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.hero-head h1 {
+  font-size: 44px;
+  margin: 10px 0 8px;
+}
+.hero-head p {
+  margin: 0 auto;
+  max-width: 460px;
+  color: var(--mute);
+  font-size: 15px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+.field-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.row {
+  display: flex;
+  gap: 8px;
+}
+.row input {
+  flex: 1;
+  height: 40px;
+}
+.row button {
+  height: 40px;
+  padding: 0 20px;
+}
+.or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--mute);
+  font-size: 12px;
+  margin: 16px 0;
+}
+.or::before,
+.or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+  padding: 26px 16px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--bg);
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.dropzone span {
+  color: var(--mute);
+  font-size: 12px;
+}
+.dropzone.drag {
+  border-color: var(--accent2);
+  background: var(--surface2);
+}
+.dropzone.busy {
+  opacity: 0.55;
+  cursor: default;
+}
+.progress-box {
+  margin-top: 18px;
+}
+.progress-box div {
+  margin-top: 6px;
+  color: var(--mute);
+}
+.error {
+  color: var(--bad);
+  margin: 14px 0 0;
+}
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 26px 0 0;
+}
+.features li {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--mute);
+  background: var(--surface);
+  font-size: 12px;
+}
+
+/* Atlas */
+.atlas {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+.topbar {
+  position: relative;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+button.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  padding: 0 10px 0 0;
+  border: 0;
+  background: none;
+}
+button.brand:hover:not(:disabled) {
+  background: none;
+}
+.brand span {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+.spacer {
+  flex: 1;
+}
+.atlas-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.graph {
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.code-panel {
+  width: 480px;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+.code-panel strong {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
 }

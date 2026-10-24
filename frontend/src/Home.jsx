@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Logo from "./Logo";
 
 const MAX_MB = 100;
 
@@ -105,91 +106,91 @@ export default function Home({ onReady }) {
   const busy = submitting || jobId !== null;
 
   return (
-    <div style={{ maxWidth: 560, margin: "12vh auto 0", padding: "0 16px" }}>
-      <h1 style={{ marginBottom: 16 }}>Saptarishi</h1>
-      <form onSubmit={submitUrl} style={{ display: "flex", gap: 8 }}>
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://github.com/owner/repo"
-          disabled={busy}
-          style={{ flex: 1, padding: 8 }}
-        />
-        <button type="submit" disabled={busy || !url.trim()}>
-          Analyse
-        </button>
-      </form>
-
-      <div
-        style={{
-          textAlign: "center",
-          color: "#888",
-          margin: "12px 0",
-          fontSize: 13,
-        }}
-      >
-        or
+    <main className="hero">
+      <div className="hero-head">
+        <Logo size={48} />
+        <h1>Saptarishi</h1>
+        <p>
+          See how a codebase fits together: its dependencies, its hot spots, and
+          where a newcomer should start.
+        </p>
       </div>
 
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => !busy && fileRef.current?.click()}
-        onKeyDown={(e) =>
-          e.key === "Enter" && !busy && fileRef.current?.click()
-        }
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!busy) setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          if (!busy) submitFile(e.dataTransfer.files[0]);
-        }}
-        style={{
-          border: `2px dashed ${dragging ? "#2b7bd9" : "#bbb"}`,
-          background: dragging ? "#eef3fb" : "transparent",
-          borderRadius: 8,
-          padding: "28px 16px",
-          textAlign: "center",
-          color: "#555",
-          cursor: busy ? "default" : "pointer",
-          opacity: busy ? 0.6 : 1,
-        }}
-      >
-        Drop a .zip of your project here, or click to choose
-        <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-          Up to {MAX_MB} MB
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".zip,application/zip"
-          hidden
-          onChange={(e) => {
-            submitFile(e.target.files[0]);
-            e.target.value = "";
-          }}
-        />
-      </div>
-
-      {status && (
-        <div style={{ marginTop: 16 }}>
-          <progress
-            value={status.progress ?? undefined}
-            max={100}
-            style={{ width: "100%" }}
+      <section className="card">
+        <label className="field-label" htmlFor="repo-url">
+          GitHub repository
+        </label>
+        <form onSubmit={submitUrl} className="row">
+          <input
+            id="repo-url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://github.com/owner/repo"
+            disabled={busy}
           />
-          <div style={{ fontSize: 13, color: "#555" }}>
-            {status.progress == null
-              ? status.stage
-              : `${status.stage} (${status.progress}%)`}
-          </div>
+          <button type="submit" disabled={busy || !url.trim()}>
+            Analyse
+          </button>
+        </form>
+
+        <div className="or">or</div>
+
+        <div
+          role="button"
+          tabIndex={0}
+          className={`dropzone${dragging ? " drag" : ""}${busy ? " busy" : ""}`}
+          onClick={() => !busy && fileRef.current?.click()}
+          onKeyDown={(e) =>
+            e.key === "Enter" && !busy && fileRef.current?.click()
+          }
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!busy) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (!busy) submitFile(e.dataTransfer.files[0]);
+          }}
+        >
+          <strong>Drop a .zip of your project here</strong>
+          <span>or click to choose · up to {MAX_MB} MB</span>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".zip,application/zip"
+            hidden
+            onChange={(e) => {
+              submitFile(e.target.files[0]);
+              e.target.value = "";
+            }}
+          />
         </div>
-      )}
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-    </div>
+
+        {status && (
+          <div className="progress-box">
+            <progress value={status.progress ?? undefined} max={100} />
+            <div>
+              {status.progress == null
+                ? status.stage
+                : `${status.stage} (${status.progress}%)`}
+            </div>
+          </div>
+        )}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+
+      <ul className="features">
+        <li>Dependency map</li>
+        <li>Churn × complexity heat</li>
+        <li>Call graph</li>
+        <li>Where to start</li>
+      </ul>
+    </main>
   );
 }

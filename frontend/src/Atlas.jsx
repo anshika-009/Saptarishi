@@ -6,58 +6,54 @@ import CodePanel from "./CodePanel";
 import SearchBox from "./SearchBox";
 import HealthPanel from "./HealthPanel";
 import CallGraph from "./CallGraph";
+import Logo from "./Logo";
+import { C, heatColor } from "./Theme";
 import PathfinderPanel from "./PathfinderPanel";
 
 cytoscape.use(fcose);
 
-// Green (stable) to red (changed often and complex), for the churn heatmap.
-const heatColor = (h) => {
-  const t = Math.max(0, Math.min(100, h)) / 100;
-  const mix = (a, b) => Math.round(a + (b - a) * t);
-  return `rgb(${mix(107, 217)}, ${mix(191, 48)}, ${mix(138, 37)})`;
-};
-
-const OUT = "#2b7bd9";
-const IN = "#2a9d5c";
-const GOD = "#8e24aa";
+const OUT = C.out;
+const IN = C.inn;
+const GOD = C.god;
 
 const style = [
+  { selector: "node", style: { "font-family": C.sans } },
   {
     selector: 'node[kind = "file"]',
     style: {
       label: "data(label)",
-      color: "#222",
+      color: C.ink,
       "font-size": 11,
       "min-zoomed-font-size": 9,
       "text-valign": "bottom",
       "text-margin-y": 5,
-      "text-background-color": "#ffffff",
+      "text-background-color": C.surface,
       "text-background-opacity": 0.85,
       "text-background-padding": 2,
-      "background-color": "#888",
+      "background-color": C.node,
       width: "mapData(complexity, 0, 40, 22, 56)",
       height: "mapData(complexity, 0, 40, 22, 56)",
     },
   },
   {
     selector: 'node[language = "java"]',
-    style: { "background-color": "#d9822b" },
+    style: { "background-color": C.java },
   },
   {
     selector: 'node[kind = "folder"]',
     style: {
       shape: "round-rectangle",
       label: "data(label)",
-      color: "#666",
+      color: C.mute,
       "font-size": 12,
       "text-valign": "top",
       "text-halign": "center",
       "text-margin-y": -6,
       padding: 28,
-      "background-color": "#9aa0a6",
+      "background-color": C.folder,
       "background-opacity": 0.12,
       "border-width": 1,
-      "border-color": "#b5b5b5",
+      "border-color": C.folderLine,
     },
   },
   {
@@ -65,21 +61,21 @@ const style = [
     style: {
       width: 1.5,
       opacity: 0.7,
-      "line-color": "#4a6fa5",
-      "target-arrow-color": "#4a6fa5",
+      "line-color": C.edge,
+      "target-arrow-color": C.edge,
       "target-arrow-shape": "triangle",
       "curve-style": "bezier",
     },
   },
   {
     selector: "node.cyc",
-    style: { "border-width": 3, "border-color": "#d93025" },
+    style: { "border-width": 3, "border-color": C.bad },
   },
   {
     selector: "edge.cyc",
     style: {
-      "line-color": "#d93025",
-      "target-arrow-color": "#d93025",
+      "line-color": C.bad,
+      "target-arrow-color": C.bad,
       width: 2.5,
       opacity: 1,
     },
@@ -93,7 +89,7 @@ const style = [
   { selector: ".dim", style: { opacity: 0.1 } },
   {
     selector: "node.sel",
-    style: { "border-width": 3, "border-color": "#111" },
+    style: { "border-width": 3, "border-color": C.ink },
   },
   {
     selector: "edge.out",
@@ -363,199 +359,185 @@ export default function Atlas({ sha, onBack }) {
   };
 
   return (
-    <div style={{ display: "flex", width: "100%", height: "100%" }}>
-      <div
-        style={{
-          position: "relative",
-          flex: 1,
-          minWidth: 0,
-          overflow: "hidden",
-        }}
-      >
-        <div
+    <div className="atlas">
+      <header className="topbar">
+        <button
+          className="brand"
+          onClick={onBack}
+          title="Back to start"
+          aria-label="Back to start"
+        >
+          <Logo size={26} />
+          <span>Saptarishi</span>
+        </button>
+        <SearchBox sha={sha} onPick={navigate} />
+        <select
+          value={layoutName}
+          onChange={(e) => setLayoutName(e.target.value)}
+        >
+          {Object.entries(LAYOUTS).map(([key, l]) => (
+            <option key={key} value={key}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+        <select value={lang} onChange={(e) => setLang(e.target.value)}>
+          <option value="all">All languages</option>
+          {languages.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <input
+          value={pathFilter}
+          onChange={(e) => setPathFilter(e.target.value)}
+          placeholder="Filter by path…"
+          style={{ width: 130, padding: "5px 8px" }}
+        />
+        <label
           style={{
-            position: "absolute",
-            top: 8,
-            left: 8,
-            zIndex: 2,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            alignItems: "center",
-            maxWidth: "calc(100% - 16px)",
+            fontSize: 13,
+            background: "var(--surface)",
+            padding: "4px 8px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
           }}
         >
-          <button onClick={onBack}>← New repo</button>
-          <SearchBox sha={sha} onPick={navigate} />
-          <select
-            value={layoutName}
-            onChange={(e) => setLayoutName(e.target.value)}
-          >
-            {Object.entries(LAYOUTS).map(([key, l]) => (
-              <option key={key} value={key}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-          <select value={lang} onChange={(e) => setLang(e.target.value)}>
-            <option value="all">All languages</option>
-            {languages.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
           <input
-            value={pathFilter}
-            onChange={(e) => setPathFilter(e.target.value)}
-            placeholder="Filter by path…"
-            style={{ width: 130, padding: "5px 8px" }}
-          />
-          <label
+            type="checkbox"
+            checked={!hideTests}
+            onChange={(e) => setHideTests(!e.target.checked)}
+          />{" "}
+          Show tests
+        </label>
+        <label
+          style={{
+            fontSize: 13,
+            background: "var(--surface)",
+            padding: "4px 8px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showCycles}
+            onChange={(e) => setShowCycles(e.target.checked)}
+          />{" "}
+          Circular imports ({analysis ? analysis.cycles.length : "…"})
+        </label>
+        <label
+          style={{
+            fontSize: 13,
+            background: "var(--surface)",
+            padding: "4px 8px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showGods}
+            onChange={(e) => setShowGods(e.target.checked)}
+          />{" "}
+          <span style={{ color: GOD }}>God files</span> (
+          {health ? health.godFiles.length : "…"})
+        </label>
+        <label
+          style={{
+            fontSize: 13,
+            background: "var(--surface)",
+            padding: "4px 8px",
+            borderRadius: 8,
+            border: "1px solid var(--line)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showHeat}
+            onChange={(e) => setShowHeat(e.target.checked)}
+          />{" "}
+          Churn heatmap
+          {showHeat && churn === null && " (reading git history…)"}
+        </label>
+        {showHeat && churn && (
+          <span
             style={{
-              fontSize: 13,
-              background: "#fff",
+              fontSize: 12,
+              background: "var(--surface)",
               padding: "4px 8px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
+              borderRadius: 8,
+              border: "1px solid var(--line)",
+              color: churn.available ? "var(--mute)" : "var(--warn-text)",
             }}
           >
-            <input
-              type="checkbox"
-              checked={!hideTests}
-              onChange={(e) => setHideTests(!e.target.checked)}
-            />{" "}
-            Show tests
-          </label>
-          <label
-            style={{
-              fontSize: 13,
-              background: "#fff",
-              padding: "4px 8px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showCycles}
-              onChange={(e) => setShowCycles(e.target.checked)}
-            />{" "}
-            Circular imports ({analysis ? analysis.cycles.length : "…"})
-          </label>
-          <label
-            style={{
-              fontSize: 13,
-              background: "#fff",
-              padding: "4px 8px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showGods}
-              onChange={(e) => setShowGods(e.target.checked)}
-            />{" "}
-            <span style={{ color: GOD }}>God files</span> (
-            {health ? health.godFiles.length : "…"})
-          </label>
-          <label
-            style={{
-              fontSize: 13,
-              background: "#fff",
-              padding: "4px 8px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showHeat}
-              onChange={(e) => setShowHeat(e.target.checked)}
-            />{" "}
-            Churn heatmap
-            {showHeat && churn === null && " (reading git history…)"}
-          </label>
-          {showHeat && churn && (
-            <span
+            {churn.available
+              ? `pale = stable, deep red = changed often and complex (last ${churn.commitsExamined} commits)`
+              : churn.reason}
+          </span>
+        )}
+        <span className="spacer" />
+        <button className="primary" onClick={() => setShowPath((v) => !v)}>
+          {showPath ? "Hide onboarding" : "Where to start"}
+        </button>
+      </header>
+      <div className="atlas-body">
+        <div className="canvas-wrap">
+          {error && (
+            <p
               style={{
-                fontSize: 12,
-                background: "#fff",
-                padding: "4px 8px",
-                borderRadius: 4,
-                border: "1px solid #ddd",
-                color: churn.available ? "#555" : "#a15c00",
+                position: "absolute",
+                top: 8,
+                right: 8,
+                zIndex: 1,
+                color: "crimson",
+                margin: 0,
               }}
             >
-              {churn.available
-                ? `green = stable, red = often changed and complex (last ${churn.commitsExamined} commits)`
-                : churn.reason}
-            </span>
+              Could not load graph: {error}
+            </p>
           )}
-          <button onClick={() => setShowPath((v) => !v)}>
-            {showPath ? "Hide onboarding" : "Where to start"}
-          </button>
+          <div ref={containerRef} className="graph" />
+          <HealthPanel health={health} onNavigate={navigate} />
+          {showPath && (
+            <PathfinderPanel
+              sha={sha}
+              onNavigate={navigate}
+              onClose={() => setShowPath(false)}
+            />
+          )}
+          {callRoot && (
+            <CallGraph
+              sha={sha}
+              method={callRoot}
+              onOpen={openMethod}
+              onClose={() => setCallRoot(null)}
+            />
+          )}
         </div>
-        {error && (
-          <p
-            style={{
-              position: "absolute",
-              top: 8,
-              right: 8,
-              zIndex: 1,
-              color: "crimson",
-              margin: 0,
-            }}
-          >
-            Could not load graph: {error}
-          </p>
-        )}
-        <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
-        <HealthPanel health={health} onNavigate={navigate} />
-        {showPath && (
-          <PathfinderPanel
-            sha={sha}
-            onNavigate={navigate}
-            onClose={() => setShowPath(false)}
-          />
-        )}
-        {callRoot && (
-          <CallGraph
-            sha={sha}
-            method={callRoot}
-            onOpen={openMethod}
-            onClose={() => setCallRoot(null)}
-          />
+        {selection && (
+          <aside className="code-panel">
+            <CodePanel
+              sha={sha}
+              path={selection.id}
+              line={selection.line}
+              metrics={metricsById.get(selection.id)}
+              cycle={cycleOf.get(selection.id)}
+              god={godById.get(selection.id)}
+              heat={
+                showHeat && churn?.available
+                  ? heatById.get(selection.id)
+                  : undefined
+              }
+              commitsExamined={churn?.commitsExamined}
+              onNavigate={navigate}
+              onMethod={openMethod}
+              onClose={() => setSelection(null)}
+            />
+          </aside>
         )}
       </div>
-      {selection && (
-        <div
-          style={{
-            width: 480,
-            borderLeft: "1px solid #ddd",
-            background: "#fff",
-          }}
-        >
-          <CodePanel
-            sha={sha}
-            path={selection.id}
-            line={selection.line}
-            metrics={metricsById.get(selection.id)}
-            cycle={cycleOf.get(selection.id)}
-            god={godById.get(selection.id)}
-            heat={
-              showHeat && churn?.available
-                ? heatById.get(selection.id)
-                : undefined
-            }
-            commitsExamined={churn?.commitsExamined}
-            onNavigate={navigate}
-            onMethod={openMethod}
-            onClose={() => setSelection(null)}
-          />
-        </div>
-      )}
     </div>
   );
 }

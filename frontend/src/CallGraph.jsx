@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
+import { C } from "./Theme";
 
 const STYLE = [
+  { selector: "node", style: { "font-family": C.sans } },
   {
     selector: "node",
     style: {
@@ -9,10 +11,10 @@ const STYLE = [
       "font-size": 10,
       "text-valign": "bottom",
       "text-margin-y": 4,
-      "text-background-color": "#fff",
+      "text-background-color": C.surface,
       "text-background-opacity": 0.85,
       "text-background-padding": 2,
-      "background-color": "#7a8fa6",
+      "background-color": C.node,
       width: "mapData(complexity, 1, 30, 18, 44)",
       height: "mapData(complexity, 1, 30, 18, 44)",
     },
@@ -20,17 +22,17 @@ const STYLE = [
   {
     selector: "node.root",
     style: {
-      "background-color": "#d93025",
+      "background-color": C.accent2,
       "border-width": 3,
-      "border-color": "#111",
+      "border-color": C.ink,
     },
   },
   {
     selector: "edge",
     style: {
       width: 1.5,
-      "line-color": "#6b7a8c",
-      "target-arrow-color": "#6b7a8c",
+      "line-color": C.edge,
+      "target-arrow-color": C.edge,
       "target-arrow-shape": "triangle",
       "curve-style": "bezier",
     },
@@ -124,10 +126,10 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
         zIndex: 4,
         display: "flex",
         flexDirection: "column",
-        background: "#fff",
-        border: "1px solid #ccc",
-        borderRadius: 6,
-        boxShadow: "0 4px 16px rgba(0,0,0,.18)",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 10,
+        boxShadow: "var(--shadow)",
       }}
     >
       <div
@@ -136,7 +138,7 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
           gap: 8,
           alignItems: "center",
           padding: "6px 10px",
-          borderBottom: "1px solid #eee",
+          borderBottom: "1px solid var(--line-soft)",
         }}
       >
         <strong
@@ -172,7 +174,7 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
         <div ref={boxRef} style={{ position: "absolute", inset: 0 }} />
         {!data && !error && (
-          <p style={{ padding: 12, color: "#666" }}>Loading…</p>
+          <p style={{ padding: 12, color: "var(--mute)" }}>Loading…</p>
         )}
         {error && (
           <p style={{ padding: 12, color: "crimson" }}>
@@ -183,9 +185,9 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
       <div
         style={{
           fontSize: 11,
-          color: "#777",
+          color: "var(--mute)",
           padding: "4px 10px",
-          borderTop: "1px solid #eee",
+          borderTop: "1px solid var(--line-soft)",
         }}
       >
         Arrow = calls. Dashed = best guess from a unique method name. Click a
