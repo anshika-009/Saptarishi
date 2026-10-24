@@ -895,3 +895,75 @@ button.fl {
 .cycle-note {
   font-family: var(--sans);
 }
+
+/* Edge-type and parse-status swatches, rankings list */
+.sw.ref {
+  width: 18px;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px dashed #7a705c;
+  background: none;
+}
+.sw.unp {
+  border: 2px dashed var(--mute);
+  background: transparent;
+}
+.tiles {
+  grid-template-columns: repeat(3, 1fr);
+}
+button.rank {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  padding: 8px 0;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: none;
+}
+.rank-n {
+  flex: none;
+  width: 20px;
+  color: var(--mute);
+  font: 12px var(--mono);
+}
+.rank-main {
+  min-width: 0;
+}
+.rank-main strong {
+  display: block;
+  font-size: 13px;
+}
+.rank-main small {
+  display: block;
+  color: var(--mute);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dot-heat {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+}
+
+/* Fixed screen: the page never scrolls or bounces while the map is open */
+.atlas {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body:has(.atlas) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.graph {
+  touch-action: none;
+  user-select: none;
+}

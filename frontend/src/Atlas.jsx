@@ -11,6 +11,7 @@ import { C, heatColor } from "./Theme";
 import PathfinderPanel from "./PathfinderPanel";
 import Guide from "./Guide";
 import CyclePanel from "./CyclePanel";
+import InsightsPanel from "./InsightsPanel";
 
 function Chip({ on, onChange, children, title, swatch }) {
   return (
@@ -52,7 +53,9 @@ const style = [
       label: "data(label)",
       color: C.ink,
       "font-size": 11,
-      "min-zoomed-font-size": 9,
+      "min-zoomed-font-size": 8,
+      "text-wrap": "ellipsis",
+      "text-max-width": 130,
       "text-valign": "bottom",
       "text-margin-y": 5,
       "text-background-color": C.surface,
@@ -73,13 +76,17 @@ const style = [
       shape: "round-rectangle",
       label: "data(label)",
       color: C.mute,
-      "font-size": 12,
+      "font-size": 13,
+      "font-weight": 600,
+      "min-zoomed-font-size": 7,
+      "text-wrap": "ellipsis",
+      "text-max-width": 180,
       "text-valign": "top",
       "text-halign": "center",
       "text-margin-y": -6,
       padding: 28,
       "background-color": C.folder,
-      "background-opacity": 0.12,
+      "background-opacity": "mapData(depth, 0, 4, 0.07, 0.24)",
       "border-width": 1,
       "border-color": C.folderLine,
     },
@@ -93,6 +100,16 @@ const style = [
       "target-arrow-color": C.edge,
       "target-arrow-shape": "triangle",
       "curve-style": "bezier",
+    },
+  },
+  { selector: 'edge[etype = "REFERENCE"]', style: { "line-style": "dashed" } },
+  { selector: "edge.far", style: { opacity: 0.3, width: 1 } },
+  {
+    selector: "node[?unparsed]",
+    style: {
+      "border-width": 2,
+      "border-style": "dashed",
+      "border-color": C.mute,
     },
   },
   {
@@ -190,9 +207,11 @@ export default function Atlas({ sha, onBack }) {
   const [callRoot, setCallRoot] = useState(null); // method id shown in the call graph drawer
   const [churn, setChurn] = useState(null); // { available, reason, commitsExamined, files }
   const searchRef = useRef(null);
+  const frameRef = useRef(null); // refits the view and resets the zoom limits
   const focusRef = useRef(null);
   const [focusTick, setFocusTick] = useState(0);
   const [showCycleList, setShowCycleList] = useState(false);
+  const [showRank, setShowRank] = useState(false);
   const [guide, setGuide] = useState(() => {
     try {
       return !localStorage.getItem("saptarishi-guide");
@@ -224,6 +243,7 @@ export default function Atlas({ sha, onBack }) {
       java: by.java || 0,
       total: data.nodes.length,
       edges: data.edges.length,
+      unparsed: data.nodes.filter((n) => n.parsed === false).length,
     };
   }, [data]);
   // Only Java is parsed, so other languages can never have arrows. Hide them by default
@@ -322,11 +342,16 @@ export default function Atlas({ sha, onBack }) {
         .filter((e) => e.data.kind !== "folder")
         .map((e) => ({ data: { ...e.data, parent: undefined } }));
     }
+    const PAD = 30;
     const cy = cytoscape({
       container: containerRef.current,
       elements,
       style,
-      layout: options,
+      minZoom: 0.02,
+      maxZoom: 2.5,
+      wheelSensitivity: 0.3,
+      autoungrabify: true, // files stay where the layout put them
+      boxSelectionEnabled: false,
     });
     cy.on("tap", 'node[kind = "file"]', (evt) => {
       setHint(false);
@@ -348,11 +373,82 @@ export default function Atlas({ sha, onBack }) {
       if (containerRef.current) containerRef.current.style.cursor = "";
     });
     cy.on("pan zoom", () => setHover(null));
+
+    // Camera limits: you can never zoom out past "whole map fits", never zoom in
+    // endlessly, and never drag the map off screen.
+    const bounds = () =>
+      cy
+        .elements(":visible")
+        .boundingBox({ includeLabels: false, includeOverlays: false });
+    const fitZoom = () => {
+      const bb = bounds();
+      return Math.min(
+        (cy.width() - 2 * PAD) / Math.max(bb.w, 1),
+        (cy.height() - 2 * PAD) / Math.max(bb.h, 1),
+      );
+    };
+    const limits = () => cy.minZoom(Math.max(0.01, Math.min(fitZoom(), 1)));
+    let clamping = false;
+    const clampPan = () => {
+      if (clamping || cy.elements(":visible").empty()) return;
+      const bb = bounds();
+      const z = cy.zoom();
+      const p = cy.pan();
+      const axis = (lo, hi, size, pan) => {
+        const span = (hi - lo) * z;
+        if (span + 2 * PAD <= size) return (size - span) / 2 - lo * z; // centred
+        return Math.min(PAD - lo * z, Math.max(size - PAD - hi * z, pan));
+      };
+      const nx = axis(bb.x1, bb.x2, cy.width(), p.x);
+      const ny = axis(bb.y1, bb.y2, cy.height(), p.y);
+      if (Math.abs(nx - p.x) > 0.5 || Math.abs(ny - p.y) > 0.5) {
+        clamping = true;
+        cy.pan({ x: nx, y: ny });
+        clamping = false;
+      }
+    };
+    // Zoomed far out, soften the edges so the folder structure stays readable.
+    let far = null;
+    const detail = () => {
+      const f = cy.zoom() < 0.45;
+      if (f !== far) {
+        far = f;
+        cy.edges().toggleClass("far", f);
+      }
+    };
+    const frame = () => {
+      cy.resize();
+      limits();
+      cy.fit(cy.elements(":visible"), PAD);
+      clampPan();
+      detail();
+    };
+    cy.on("pan zoom", clampPan);
+    cy.on("zoom", detail);
+    cy.on("tap", 'node[kind = "folder"]', (evt) => {
+      if (evt.target.descendants('[kind = "file"]').not(".hidden").empty())
+        return;
+      cy.animate({ fit: { eles: evt.target, padding: 40 } }, { duration: 300 });
+    });
+    const box = containerRef.current;
+    const ro = new ResizeObserver(() => {
+      cy.resize();
+      limits();
+      clampPan();
+    });
+    ro.observe(box);
+    frameRef.current = frame;
+
+    const layout = cy.layout({ ...options, fit: false });
+    layout.one("layoutstop", frame);
+    layout.run();
     cy.on("tap", (evt) => evt.target === cy && setSelection(null));
     cyRef.current = cy;
     return () => {
+      ro.disconnect();
       cy.destroy();
       cyRef.current = null;
+      frameRef.current = null;
     };
   }, [data, hideTests, layoutName, hideUnanalysed]);
 
@@ -437,6 +533,7 @@ export default function Atlas({ sha, onBack }) {
           folder.addClass("hidden");
       });
     });
+    frameRef.current?.();
   }, [lang, pathFilter, data, hideTests, layoutName, hideUnanalysed]);
 
   useEffect(() => {
@@ -483,7 +580,7 @@ export default function Atlas({ sha, onBack }) {
       renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
     });
   };
-  const fit = () => cyRef.current?.fit(undefined, 40);
+  const fit = () => frameRef.current?.();
 
   const navigate = (id, line = null) => {
     setHint(false);
@@ -532,6 +629,7 @@ export default function Atlas({ sha, onBack }) {
           className="primary"
           onClick={() => {
             setShowCycleList(false);
+            setShowRank(false);
             setShowPath((v) => !v);
           }}
         >
@@ -565,6 +663,7 @@ export default function Atlas({ sha, onBack }) {
             title="List every circular import and the files in it"
             onClick={() => {
               setShowPath(false);
+              setShowRank(false);
               setShowCycleList((v) => !v);
             }}
           >
@@ -587,6 +686,21 @@ export default function Atlas({ sha, onBack }) {
         >
           Churn heat{showHeat && churn === null ? " (loading…)" : ""}
         </Chip>
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={showRank}
+          title="Hottest files from git history, and the files most others depend on"
+          onClick={() => {
+            const next = !showRank;
+            setShowPath(false);
+            setShowCycleList(false);
+            setShowRank(next);
+            if (next) setShowHeat(true);
+          }}
+        >
+          Rankings
+        </button>
         <span className="vsep" />
         <span className="lens-label">Filter</span>
         <select
@@ -653,6 +767,15 @@ export default function Atlas({ sha, onBack }) {
           )}
         </div>
       )}
+      {stats && stats.unparsed > 0 && (
+        <div className="notice" role="note">
+          <span>
+            {stats.unparsed} file{stats.unparsed === 1 ? "" : "s"} could not be
+            parsed (unsupported syntax or encoding), so they have no arrows.
+            They are drawn with dashed outlines.
+          </span>
+        </div>
+      )}
       {stats && stats.java > 0 && stats.edges === 0 && (
         <div className="notice" role="alert">
           <span>
@@ -687,8 +810,8 @@ export default function Atlas({ sha, onBack }) {
           {data && hint && !selection && (
             <div className="hint" role="note">
               <span>
-                Click any file to see what it uses and what uses it. Scroll to
-                zoom, drag to pan.
+                Click a file to inspect it, or a folder to zoom into it. Scroll
+                to zoom, drag to pan.
               </span>
               <button onClick={() => setHint(false)} aria-label="Dismiss tip">
                 ×
@@ -737,9 +860,16 @@ export default function Atlas({ sha, onBack }) {
                 <Lg sw="dot">File. Bigger = more complex.</Lg>
                 <Lg sw="box">Folder.</Lg>
                 <Lg sw="out">
-                  Arrow: A imports B. Selected file: black = it uses, red = uses
-                  it.
+                  Solid arrow: A imports B. Selected file: black = it uses, red
+                  = uses it.
                 </Lg>
+                <Lg sw="ref">
+                  Dashed arrow: A uses B from the same package (no import
+                  needed).
+                </Lg>
+                {stats && stats.unparsed > 0 && (
+                  <Lg sw="unp">Dashed outline: file could not be parsed.</Lg>
+                )}
                 {showCycles && <Lg sw="cyc">Circular import loop.</Lg>}
                 {showGods && (
                   <Lg sw="god">God file: big, complex, widely connected.</Lg>
@@ -769,6 +899,15 @@ export default function Atlas({ sha, onBack }) {
               onFocus={focusCycle}
               onOpen={navigate}
               onClose={() => setShowCycleList(false)}
+            />
+          )}
+          {showRank && (
+            <InsightsPanel
+              churn={churn}
+              analysis={analysis}
+              hideTests={hideTests}
+              onOpen={navigate}
+              onClose={() => setShowRank(false)}
             />
           )}
           {showPath && (

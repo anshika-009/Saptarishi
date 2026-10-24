@@ -46,6 +46,7 @@ export function toElements(
 
   const els = [];
   const seen = new Set();
+  const depthOf = new Map(); // visible folder path -> nesting depth
 
   for (const n of files) {
     const parts = n.folder ? n.folder.split("/") : [];
@@ -54,12 +55,15 @@ export function toElements(
       if (isPass(path) || seen.has(path)) continue;
       seen.add(path);
       const parent = visibleAncestor(path);
+      const depth = parent ? (depthOf.get(parent) ?? 0) + 1 : 0;
+      depthOf.set(path, depth);
       els.push({
         data: {
           id: "dir:" + path,
           label: parent ? path.slice(parent.length + 1) : path,
           parent: parent ? "dir:" + parent : undefined,
           kind: "folder",
+          depth,
         },
       });
     }
@@ -76,6 +80,7 @@ export function toElements(
         language: n.language,
         complexity: n.complexity,
         tokens: n.tokens,
+        unparsed: n.parsed === false,
       },
     });
   }
@@ -87,6 +92,7 @@ export function toElements(
           id: e.source + "->" + e.target,
           source: e.source,
           target: e.target,
+          etype: e.type,
         },
       });
     }
