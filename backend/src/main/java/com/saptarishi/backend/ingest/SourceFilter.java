@@ -21,12 +21,12 @@ public class SourceFilter {
             Map.entry("js", "javascript"), Map.entry("jsx", "javascript"),
             Map.entry("mjs", "javascript"), Map.entry("cjs", "javascript"),
             Map.entry("ts", "typescript"), Map.entry("tsx", "typescript"),
-            Map.entry("py", "python"));
+            Map.entry("py", "python"), Map.entry("go", "go"));
 
     // Other text files: kept as plain nodes, not parsed.
     private static final Set<String> TEXT = Set.of(
             "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml", "html",
-            "css", "scss", "sql", "sh", "kt", "go", "rs", "c", "h", "cpp", "cs", "rb", "php", "swift");
+            "css", "scss", "sql", "sh", "kt", "rs", "c", "h", "cpp", "cs", "rb", "php", "swift");
 
     public String classify(String relPath) {
         String[] segs = relPath.split("/");
@@ -35,6 +35,8 @@ public class SourceFilter {
         }
         String name = segs[segs.length - 1];
         if (EXCLUDED_NAMES.contains(name) || name.endsWith(".min.js")) return null;
+
+        if (name.equals("go.mod")) return "gomod"; // read for its module path, not shown as a source file
 
         int dot = name.lastIndexOf('.');
         if (dot <= 0) return null; // no extension, or a dotfile

@@ -231,7 +231,7 @@ class HealthScoreTest {
 
         List<GraphNode> mixed = new ArrayList<>(nodes);
         for (int i = 0; i < 40; i++) {
-            mixed.add(new GraphNode("web/c" + i + ".js", "web", "javascript", 0, 0, 100, true));
+            mixed.add(new GraphNode("web/c" + i + ".go", "web", "go", 0, 0, 100, true));
         }
         var withJs = HealthScore.of(new Graph(mixed, edges));
 

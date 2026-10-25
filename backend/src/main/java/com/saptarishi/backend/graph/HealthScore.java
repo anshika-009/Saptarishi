@@ -47,7 +47,7 @@ public final class HealthScore {
      * no import edges, so counting it would make a tangled repo look healthy. Add a language here
      * when its parser is added.
      */
-    public static final Set<String> SCORED_LANGUAGES = Set.of("java");
+    public static final Set<String> SCORED_LANGUAGES = Set.of("java", "javascript", "typescript", "python", "go");
 
     public record GodFile(String id, int loc, int complexity, int fanIn, int fanOut,
                           double score, double sizePct, double complexityPct, double connectivityPct) {}
@@ -175,14 +175,20 @@ public final class HealthScore {
         return "F";
     }
 
-    /** Anything under a test/ or tests/ folder (src/test/java, test/, ...). */
+    /** Test files: anything under a test/, tests/ or __tests__/ folder, plus *.test.* / *.spec.* scripts and Python test_*.py, *_test.py, conftest.py. */
     public static boolean isTestPath(String id) {
-        return ("/" + id).matches(".*/tests?/.*");
+        String path = "/" + id;
+        if (path.matches(".*/(tests?|__tests__)/.*")) return true;
+        String name = path.substring(path.lastIndexOf('/') + 1);
+        return name.matches(".+\\.(test|spec)\\.[cm]?[jt]sx?")
+                || name.matches("test_.+\\.py") || name.matches(".+_test\\.py")
+                || name.equals("conftest.py") || name.endsWith("_test.go");
     }
 
     /** Files that carry no logic and would only distort the percentiles. */
     public static boolean isBoilerplate(String id) {
-        return id.endsWith("package-info.java") || id.endsWith("module-info.java");
+        return id.endsWith("package-info.java") || id.endsWith("module-info.java") || id.endsWith(".d.ts")
+                || id.endsWith(".pb.go");
     }
 
     /**
