@@ -10,7 +10,7 @@ public class SourceFilter {
 
     private static final Set<String> EXCLUDED_DIRS = Set.of(
             ".git", "node_modules", "target", "build", "dist", "vendor", "out",
-            ".idea", ".vscode", ".gradle", "__pycache__", "venv", ".venv");
+            ".idea", ".vscode", ".gradle", "__pycache__", "venv", ".venv", "obj");
 
     private static final Set<String> EXCLUDED_NAMES = Set.of(
             "package-lock.json", "yarn.lock", "pnpm-lock.yaml");
@@ -21,12 +21,13 @@ public class SourceFilter {
             Map.entry("js", "javascript"), Map.entry("jsx", "javascript"),
             Map.entry("mjs", "javascript"), Map.entry("cjs", "javascript"),
             Map.entry("ts", "typescript"), Map.entry("tsx", "typescript"),
-            Map.entry("py", "python"), Map.entry("go", "go"));
+            Map.entry("py", "python"), Map.entry("go", "go"),
+            Map.entry("cs", "csharp"), Map.entry("rs", "rust"));
 
     // Other text files: kept as plain nodes, not parsed.
     private static final Set<String> TEXT = Set.of(
             "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml", "html",
-            "css", "scss", "sql", "sh", "kt", "rs", "c", "h", "cpp", "cs", "rb", "php", "swift");
+            "css", "scss", "sql", "sh", "kt", "c", "h", "cpp", "rb", "php", "swift");
 
     public String classify(String relPath) {
         String[] segs = relPath.split("/");

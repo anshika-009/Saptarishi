@@ -61,6 +61,16 @@
 		</dependency>
 		<dependency>
     <groupId>io.github.bonede</groupId>
+    <artifactId>tree-sitter-c-sharp</artifactId>
+    <version>0.23.1</version>
+</dependency>
+<dependency>
+    <groupId>io.github.bonede</groupId>
+    <artifactId>tree-sitter-rust</artifactId>
+    <version>0.24.0</version>
+</dependency>
+		<dependency>
+    <groupId>io.github.bonede</groupId>
     <artifactId>tree-sitter</artifactId>
     <version>0.25.3</version>
 </dependency>

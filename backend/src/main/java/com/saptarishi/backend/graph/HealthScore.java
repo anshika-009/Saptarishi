@@ -47,7 +47,7 @@ public final class HealthScore {
      * no import edges, so counting it would make a tangled repo look healthy. Add a language here
      * when its parser is added.
      */
-    public static final Set<String> SCORED_LANGUAGES = Set.of("java", "javascript", "typescript", "python", "go");
+    public static final Set<String> SCORED_LANGUAGES = Set.of("java", "javascript", "typescript", "python", "go", "csharp", "rust");
 
     public record GodFile(String id, int loc, int complexity, int fanIn, int fanOut,
                           double score, double sizePct, double complexityPct, double connectivityPct) {}
@@ -178,17 +178,22 @@ public final class HealthScore {
     /** Test files: anything under a test/, tests/ or __tests__/ folder, plus *.test.* / *.spec.* scripts and Python test_*.py, *_test.py, conftest.py. */
     public static boolean isTestPath(String id) {
         String path = "/" + id;
-        if (path.matches(".*/(tests?|__tests__)/.*")) return true;
+        if (path.matches("(?i).*/(tests?|__tests__)/.*")) return true;
+        if (path.matches("(?i).*/[^/]*\\.(unit|integration)?tests?/.*")) return true; // C#: MyApp.Tests/
         String name = path.substring(path.lastIndexOf('/') + 1);
         return name.matches(".+\\.(test|spec)\\.[cm]?[jt]sx?")
                 || name.matches("test_.+\\.py") || name.matches(".+_test\\.py")
-                || name.equals("conftest.py") || name.endsWith("_test.go");
+                || name.equals("conftest.py") || name.endsWith("_test.go")
+                || name.matches("(.*[a-z0-9])?Tests?\\.cs")
+                || name.equals("tests.rs") || name.endsWith("_test.rs") || name.endsWith("_tests.rs");
     }
 
     /** Files that carry no logic and would only distort the percentiles. */
     public static boolean isBoilerplate(String id) {
         return id.endsWith("package-info.java") || id.endsWith("module-info.java") || id.endsWith(".d.ts")
-                || id.endsWith(".pb.go");
+                || id.endsWith(".pb.go")
+                || id.endsWith(".Designer.cs") || id.endsWith(".g.cs") || id.endsWith(".g.i.cs")
+                || id.endsWith("AssemblyInfo.cs");
     }
 
     /**

@@ -39,7 +39,7 @@ class StartersTest {
         edges.add(edge("src/main/CyB.java", "src/main/CyA.java"));
         nodes.add(java("src/test/CoreTest.java", 6, 40));
         for (int i = 0; i < 20; i++) edges.add(edge("src/test/CoreTest.java", "src/main/F" + i + ".java"));
-        nodes.add(new GraphNode("web/app.go", "web", "go", 9, 0, 60, true));
+        nodes.add(new GraphNode("web/app.rb", "web", "ruby", 9, 0, 60, true));
         return Starters.pick(new Graph(nodes, edges), gods, hot).stream().map(Starters.Starter::path).toList();
     }
 
@@ -53,7 +53,7 @@ class StartersTest {
         assertFalse(ids.contains("src/main/Hot.java"));    // changed often
         assertFalse(ids.contains("src/main/Cx.java"));     // too complex
         assertFalse(ids.contains("src/main/CyA.java"));    // circular import
-        assertTrue(ids.stream().noneMatch(p -> p.contains("Test") || p.endsWith(".go")));
+        assertTrue(ids.stream().noneMatch(p -> p.contains("Test") || p.endsWith(".rb")));
     }
 
     @Test

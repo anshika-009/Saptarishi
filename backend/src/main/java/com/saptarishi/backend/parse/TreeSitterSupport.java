@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.treesitter.TSLanguage;
@@ -40,12 +41,24 @@ abstract class TreeSitterSupport implements LanguageSupport {
     /** Called once for every node outside comments. Add to {@code out}. */
     protected abstract void visit(TSNode node, String type, Source src, Collected out);
 
-    protected String packageName(TSNode root, Source src) { return ""; }
+    /** Whether this node adds one to the complexity. Override when the node type alone is not enough. */
+    protected boolean isDecision(TSNode node, String type, Source src) {
+        return decisionTypes().contains(type);
+    }
 
     /** What the hook may fill in. */
     static final class Collected {
+        static final int MAX_TYPE_REFS = 5000;
         final List<RawImport> imports = new ArrayList<>();
         final List<Symbol> symbols = new ArrayList<>();
+        /** Names this file mentions, for languages that link files by the types they use. */
+        final Set<String> typeRefs = new LinkedHashSet<>();
+        /** Namespace or package, "" if none. */
+        String packageName = "";
+
+        void addTypeRef(String name) {
+            if (typeRefs.size() < MAX_TYPE_REFS) typeRefs.add(name);
+        }
     }
 
     /** The file's text as UTF-8 bytes, because tree-sitter reports positions in bytes. */
@@ -113,13 +126,13 @@ abstract class TreeSitterSupport implements LanguageSupport {
                 int children = node.getChildCount();
                 if (children == 0) tokens++;
                 if (functionTypes().contains(type)) functions++;
-                if (decisionTypes().contains(type)) decisions++;
+                if (isDecision(node, type, src)) decisions++;
                 visit(node, type, src, out);
                 for (int i = children - 1; i >= 0; i--) stack.push(node.getChild(i));
             }
             out.symbols.sort((a, b) -> Integer.compare(a.line(), b.line()));
-            return new ParsedFile(path, language(), packageName(root, src), out.imports, out.symbols,
-                    tokens, functions + decisions, loc, true);
+            return new ParsedFile(path, language(), out.packageName, out.imports, out.symbols,
+                    tokens, functions + decisions, loc, true, new ArrayList<>(out.typeRefs));
         } catch (RuntimeException | StackOverflowError e) {
             return ParsedFile.unparsed(path, language(), loc);
         }

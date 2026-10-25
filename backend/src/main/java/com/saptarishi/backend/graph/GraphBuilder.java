@@ -37,6 +37,8 @@ public class GraphBuilder {
         ScriptImportResolver script = new ScriptImportResolver(allPaths);
         PythonImportResolver python = new PythonImportResolver(allPaths);
         GoImportResolver go = new GoImportResolver(files);
+        CSharpImportResolver csharp = new CSharpImportResolver(files);
+        RustImportResolver rust = new RustImportResolver(allPaths);
         List<GraphEdge> edges = new ArrayList<>();
         for (ParsedFile f : kept) {
             if (!f.parsed()) continue;
@@ -65,6 +67,18 @@ public class GraphBuilder {
                 case "go" -> {
                     Set<String> targets = new LinkedHashSet<>();
                     for (ParsedFile.RawImport i : f.imports()) targets.addAll(go.resolve(f.path(), i.name()));
+                    for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                }
+                case "csharp" -> {
+                    Set<String> imported = csharp.resolve(f);
+                    for (String t : imported) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                    for (String t : csharp.resolveReferences(f)) {
+                        if (!imported.contains(t) && ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "REFERENCE"));
+                    }
+                }
+                case "rust" -> {
+                    Set<String> targets = new LinkedHashSet<>();
+                    for (ParsedFile.RawImport i : f.imports()) rust.resolve(f.path(), i.name()).ifPresent(targets::add);
                     for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
                 }
                 default -> { }
