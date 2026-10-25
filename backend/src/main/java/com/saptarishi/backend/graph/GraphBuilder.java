@@ -39,6 +39,7 @@ public class GraphBuilder {
         GoImportResolver go = new GoImportResolver(files);
         CSharpImportResolver csharp = new CSharpImportResolver(files);
         RustImportResolver rust = new RustImportResolver(allPaths);
+        CIncludeResolver cInclude = new CIncludeResolver(allPaths);
         List<GraphEdge> edges = new ArrayList<>();
         for (ParsedFile f : kept) {
             if (!f.parsed()) continue;
@@ -79,6 +80,11 @@ public class GraphBuilder {
                 case "rust" -> {
                     Set<String> targets = new LinkedHashSet<>();
                     for (ParsedFile.RawImport i : f.imports()) rust.resolve(f.path(), i.name()).ifPresent(targets::add);
+                    for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                }
+                case "c", "cpp" -> {
+                    Set<String> targets = new LinkedHashSet<>();
+                    for (ParsedFile.RawImport i : f.imports()) cInclude.resolve(f.path(), i.name()).ifPresent(targets::add);
                     for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
                 }
                 default -> { }

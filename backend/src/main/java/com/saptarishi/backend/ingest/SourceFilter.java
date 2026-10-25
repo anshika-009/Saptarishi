@@ -1,5 +1,8 @@
 package com.saptarishi.backend.ingest;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -22,12 +25,17 @@ public class SourceFilter {
             Map.entry("mjs", "javascript"), Map.entry("cjs", "javascript"),
             Map.entry("ts", "typescript"), Map.entry("tsx", "typescript"),
             Map.entry("py", "python"), Map.entry("go", "go"),
-            Map.entry("cs", "csharp"), Map.entry("rs", "rust"));
+            Map.entry("cs", "csharp"), Map.entry("rs", "rust"),
+            // ".h" is C here; assignHeaderLanguage() turns it into C++ in a mostly-C++ repository
+            Map.entry("c", "c"), Map.entry("h", "c"),
+            Map.entry("cpp", "cpp"), Map.entry("cc", "cpp"), Map.entry("cxx", "cpp"), Map.entry("c++", "cpp"),
+            Map.entry("hpp", "cpp"), Map.entry("hh", "cpp"), Map.entry("hxx", "cpp"), Map.entry("h++", "cpp"),
+            Map.entry("ipp", "cpp"), Map.entry("tpp", "cpp"), Map.entry("inl", "cpp"));
 
     // Other text files: kept as plain nodes, not parsed.
     private static final Set<String> TEXT = Set.of(
             "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml", "html",
-            "css", "scss", "sql", "sh", "kt", "c", "h", "cpp", "rb", "php", "swift");
+            "css", "scss", "sql", "sh", "kt", "rb", "php", "swift");
 
     public String classify(String relPath) {
         String[] segs = relPath.split("/");
@@ -46,5 +54,24 @@ public class SourceFilter {
         String lang = SOURCE.get(ext);
         if (lang != null) return lang;
         return TEXT.contains(ext) ? "text" : null;
+    }
+
+    /**
+     * A {@code .h} file can be C or C++, and the extension does not say which. The repository decides: if it
+     * has at least as many C++ files as {@code .c} files, its headers are read as C++ (the C++ grammar also
+     * reads C); otherwise they stay C, so a C library with one C++ example is not relabelled. A repository
+     * with no C++ files at all is left alone.
+     */
+    public List<IndexedFile> assignHeaderLanguage(List<IndexedFile> files) {
+        long cpp = files.stream().filter(f -> "cpp".equals(f.language())).count();
+        long c = files.stream()
+                .filter(f -> "c".equals(f.language()) && f.path().toLowerCase(Locale.ROOT).endsWith(".c")).count();
+        if (cpp == 0 || cpp < c) return files;
+        List<IndexedFile> out = new ArrayList<>(files.size());
+        for (IndexedFile f : files) {
+            boolean cHeader = "c".equals(f.language()) && f.path().toLowerCase(Locale.ROOT).endsWith(".h");
+            out.add(cHeader ? new IndexedFile(f.path(), "cpp", f.size()) : f);
+        }
+        return out;
     }
 }

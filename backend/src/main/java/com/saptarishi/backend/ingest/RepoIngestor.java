@@ -120,6 +120,6 @@ public class RepoIngestor {
             out.add(new IndexedFile(rel, lang == null ? "text" : lang, Files.size(p)));
         }
         out.sort(Comparator.comparing(IndexedFile::path));
-        return out;
+        return filter.assignHeaderLanguage(out);
     }
 }
