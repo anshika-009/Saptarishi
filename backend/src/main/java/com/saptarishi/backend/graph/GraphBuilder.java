@@ -40,6 +40,10 @@ public class GraphBuilder {
         CSharpImportResolver csharp = new CSharpImportResolver(files);
         RustImportResolver rust = new RustImportResolver(allPaths);
         CIncludeResolver cInclude = new CIncludeResolver(allPaths);
+        FileRequireResolver rubyFiles = new FileRequireResolver(allPaths, "rb");
+        FileRequireResolver phpFiles = new FileRequireResolver(allPaths, "php");
+        CSharpImportResolver phpTypes = new CSharpImportResolver(files, "php");
+        CSharpImportResolver kotlinTypes = new CSharpImportResolver(files, "kotlin");
         List<GraphEdge> edges = new ArrayList<>();
         for (ParsedFile f : kept) {
             if (!f.parsed()) continue;
@@ -81,6 +85,28 @@ public class GraphBuilder {
                     Set<String> targets = new LinkedHashSet<>();
                     for (ParsedFile.RawImport i : f.imports()) rust.resolve(f.path(), i.name()).ifPresent(targets::add);
                     for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                }
+                case "ruby" -> {
+                    Set<String> targets = new LinkedHashSet<>();
+                    for (ParsedFile.RawImport i : f.imports()) rubyFiles.resolve(f.path(), i.name()).ifPresent(targets::add);
+                    for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                }
+                case "php" -> {
+                    Set<String> targets = new LinkedHashSet<>(phpTypes.resolve(f));
+                    for (ParsedFile.RawImport i : f.imports()) {
+                        if (i.name().startsWith("file:")) phpFiles.resolve(f.path(), i.name().substring(5)).ifPresent(targets::add);
+                    }
+                    for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                    for (String t : phpTypes.resolveReferences(f)) {
+                        if (!targets.contains(t) && ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "REFERENCE"));
+                    }
+                }
+                case "kotlin" -> {
+                    Set<String> targets = kotlinTypes.resolve(f);
+                    for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
+                    for (String t : kotlinTypes.resolveReferences(f)) {
+                        if (!targets.contains(t) && ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "REFERENCE"));
+                    }
                 }
                 case "c", "cpp" -> {
                     Set<String> targets = new LinkedHashSet<>();

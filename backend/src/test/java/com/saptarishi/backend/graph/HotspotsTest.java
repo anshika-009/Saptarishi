@@ -19,7 +19,7 @@ class HotspotsTest {
         List<GraphNode> nodes = new ArrayList<>();
         for (int i = 0; i < 10; i++) nodes.add(java("src/main/F" + i + ".java", 2 + i));
         nodes.add(java("src/test/FooTest.java", 50));
-        nodes.add(new GraphNode("web/app.rb", "web", "ruby", 0, 0, 100, true));
+        nodes.add(new GraphNode("web/app.swift", "web", "swift", 0, 0, 100, true));
         return nodes;
     }
 
@@ -29,7 +29,7 @@ class HotspotsTest {
 
     @Test
     void scoresOnlyProductionFilesInParsedLanguages() {
-        var r = Hotspots.compute(files(), Map.of("src/test/FooTest.java", 99, "web/app.rb", 99));
+        var r = Hotspots.compute(files(), Map.of("src/test/FooTest.java", 99, "web/app.swift", 99));
         assertEquals(10, r.size());
     }
 

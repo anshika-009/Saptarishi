@@ -30,12 +30,13 @@ public class SourceFilter {
             Map.entry("c", "c"), Map.entry("h", "c"),
             Map.entry("cpp", "cpp"), Map.entry("cc", "cpp"), Map.entry("cxx", "cpp"), Map.entry("c++", "cpp"),
             Map.entry("hpp", "cpp"), Map.entry("hh", "cpp"), Map.entry("hxx", "cpp"), Map.entry("h++", "cpp"),
-            Map.entry("ipp", "cpp"), Map.entry("tpp", "cpp"), Map.entry("inl", "cpp"));
+            Map.entry("ipp", "cpp"), Map.entry("tpp", "cpp"), Map.entry("inl", "cpp"),
+            Map.entry("rb", "ruby"), Map.entry("php", "php"), Map.entry("kt", "kotlin"), Map.entry("kts", "kotlin"));
 
     // Other text files: kept as plain nodes, not parsed.
     private static final Set<String> TEXT = Set.of(
             "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml", "html",
-            "css", "scss", "sql", "sh", "kt", "rb", "php", "swift");
+            "css", "scss", "sql", "sh", "swift");
 
     public String classify(String relPath) {
         String[] segs = relPath.split("/");

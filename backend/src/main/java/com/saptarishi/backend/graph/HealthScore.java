@@ -47,7 +47,7 @@ public final class HealthScore {
      * no import edges, so counting it would make a tangled repo look healthy. Add a language here
      * when its parser is added.
      */
-    public static final Set<String> SCORED_LANGUAGES = Set.of("java", "javascript", "typescript", "python", "go", "csharp", "rust", "c", "cpp");
+    public static final Set<String> SCORED_LANGUAGES = Set.of("java", "javascript", "typescript", "python", "go", "csharp", "rust", "c", "cpp", "ruby", "php", "kotlin");
 
     public record GodFile(String id, int loc, int complexity, int fanIn, int fanOut,
                           double score, double sizePct, double complexityPct, double connectivityPct) {}

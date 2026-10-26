@@ -15,7 +15,10 @@ import java.util.Set;
  * of the namespace that declare a type it mentions (the same idea as Java's same-package references). Types of
  * the file's own namespace and of the namespaces around it need no {@code using}, so those are linked too,
  * as references. A {@code global using} anywhere applies to every file. An alias or {@code using static}
- * names a type, so when the name is not a namespace the one around it is tried.
+ * names a type, so when the name is not a namespace the ones around it are tried.
+ *
+ * <p>The same idea fits any language where a file declares a namespace or package and imports name them or
+ * a type in them, so it also links Kotlin and PHP (pass the language; PHP's {@code \} is read as a dot).
  */
 public final class CSharpImportResolver {
 
@@ -26,8 +29,12 @@ public final class CSharpImportResolver {
     private final Set<String> globalUsings = new LinkedHashSet<>();
 
     public CSharpImportResolver(Collection<ParsedFile> files) {
+        this(files, "csharp");
+    }
+
+    public CSharpImportResolver(Collection<ParsedFile> files, String language) {
         for (ParsedFile f : files) {
-            if (!"csharp".equals(f.language()) || !f.parsed()) continue;
+            if (!language.equals(f.language()) || !f.parsed()) continue;
             for (ParsedFile.Symbol s : f.symbols()) {
                 if (TYPE_KINDS.contains(s.kind())) {
                     types.computeIfAbsent(f.packageName(), k -> new HashMap<>())
@@ -45,7 +52,8 @@ public final class CSharpImportResolver {
         List<String> names = new ArrayList<>(globalUsings);
         for (ParsedFile.RawImport i : f.imports()) names.add(i.name());
         for (String name : names) {
-            String ns = types.containsKey(name) ? name : parent(name);
+            String ns = name;
+            while (ns != null && !types.containsKey(ns)) ns = parent(ns);
             if (ns != null) collect(ns, mentioned, f.path(), out);
         }
         return out;
