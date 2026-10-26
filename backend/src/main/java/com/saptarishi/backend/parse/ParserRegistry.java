@@ -2,6 +2,7 @@ package com.saptarishi.backend.parse;
 
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -20,5 +21,10 @@ public class ParserRegistry {
     /** Returns null if there is no parser for this language (the file stays a plain node). */
     public LanguageSupport forLanguage(String language) {
         return byLanguage.get(language);
+    }
+
+    /** The languages that have a parser, sorted. The UI uses this to tell analysed files from plain ones. */
+    public List<String> languages() {
+        return List.copyOf(new TreeSet<>(byLanguage.keySet()));
     }
 }
