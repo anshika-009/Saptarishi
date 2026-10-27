@@ -967,3 +967,86 @@ body:has(.atlas) {
   touch-action: none;
   user-select: none;
 }
+
+/* Small layout fixes: keep controls readable and give the source editor real space. */
+.topbar,
+.lensbar {
+  flex-shrink: 0;
+  row-gap: 8px;
+}
+.topbar {
+  column-gap: 10px;
+}
+.lensbar {
+  column-gap: 7px;
+}
+.atlas-body {
+  position: relative;
+  min-width: 0;
+}
+.canvas-wrap {
+  min-height: 0;
+}
+.code-panel {
+  box-sizing: border-box;
+  flex: 0 0 clamp(340px, 34vw, 500px);
+  min-width: 0;
+  max-width: 48%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+.code-panel-inner {
+  width: 100%;
+  min-width: 0;
+}
+.code-panel-details {
+  overscroll-behavior: contain;
+}
+.code-editor-wrap,
+.code-editor-wrap > section,
+.code-editor-wrap .monaco-editor,
+.code-editor-wrap .overflow-guard {
+  min-height: 0;
+}
+@media (max-width: 1050px) {
+  .topbar {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .topbar .brand span {
+    font-size: 19px;
+  }
+  .lensbar {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  .code-panel {
+    flex-basis: 40%;
+  }
+}
+@media (max-width: 720px) {
+  .atlas-body {
+    overflow: hidden;
+  }
+  .code-panel {
+    position: absolute;
+    z-index: 8;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(92vw, 480px);
+    max-width: 100%;
+    flex: none;
+    box-shadow: -8px 0 24px rgba(23, 21, 15, 0.16);
+  }
+  .hint {
+    max-width: calc(100% - 100px);
+    left: 54%;
+    white-space: normal;
+    border-radius: 12px;
+  }
+  .legend {
+    width: min(260px, calc(100vw - 80px));
+  }
+}

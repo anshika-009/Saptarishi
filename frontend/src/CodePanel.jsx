@@ -146,11 +146,23 @@ export default function CodePanel({
   const analysed = data ? ANALYSED.has(data.language) : false;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div
+      className="code-panel-inner"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        minHeight: 0,
+      }}
+    >
       <div
+        className="code-panel-details"
         style={{
           padding: "8px 12px",
           borderBottom: "1px solid var(--line-soft)",
+          flex: "0 1 auto",
+          minHeight: 0,
+          overflowY: "auto",
         }}
       >
         <div
@@ -172,17 +184,26 @@ export default function CodePanel({
               <b>{data.loc}</b>
               <span>lines</span>
             </div>
-            <div className="tile" title="Cyclomatic complexity: roughly the number of decision paths. Higher is harder to follow.">
+            <div
+              className="tile"
+              title="Cyclomatic complexity: roughly the number of decision paths. Higher is harder to follow."
+            >
               <b>{data.complexity}</b>
               <span>complexity</span>
             </div>
             {metrics && (
               <>
-                <div className="tile" title="Files that import this one directly">
+                <div
+                  className="tile"
+                  title="Files that import this one directly"
+                >
                   <b>{metrics.fanIn}</b>
                   <span>used by</span>
                 </div>
-                <div className="tile" title="Blast radius: files that depend on this one, directly or through other files">
+                <div
+                  className="tile"
+                  title="Blast radius: files that depend on this one, directly or through other files"
+                >
                   <b>{metrics.blastRadius}</b>
                   <span>blast radius</span>
                 </div>
@@ -251,13 +272,22 @@ export default function CodePanel({
           <Methods sha={sha} path={path} onMethod={onMethod} />
         )}
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div
+        className="code-editor-wrap"
+        style={{
+          flex: "1 1 0",
+          minHeight: 160,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
         {error && <p style={{ color: "var(--bad)", padding: 12 }}>{error}</p>}
         {!data && !error && (
           <p style={{ padding: 12, color: "var(--mute)" }}>Loading…</p>
         )}
         {data && (
           <Editor
+            height="100%"
             theme="saptarishi"
             beforeMount={defineMonaco}
             key={`${path}:${line ?? ""}`}

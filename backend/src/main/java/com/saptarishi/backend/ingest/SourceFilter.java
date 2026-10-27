@@ -38,6 +38,7 @@ public class SourceFilter {
             "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml", "html",
             "css", "scss", "sql", "sh", "swift");
 
+    //returns the language name of the corr file if it is to be kept
     public String classify(String relPath) {
         String[] segs = relPath.split("/");
         for (int i = 0; i < segs.length - 1; i++) {

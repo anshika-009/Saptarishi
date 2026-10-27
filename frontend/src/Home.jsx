@@ -12,7 +12,7 @@ const EXAMPLES = [
 
 const STEPS = [
   ["Paste a repository", "A public GitHub link, or a .zip of your own project."],
-  ["Give it a moment", "Every Java file is read and its imports are traced."],
+  ["Give it a moment", "Every source file is read and its imports are traced."],
   ["Explore the map", "Click files, spot risky areas, find where to begin."],
 ];
 
@@ -252,7 +252,7 @@ export default function Home({ onReady }) {
           </p>
         )}
         <p className="fineprint">
-          Java projects only for now · public GitHub repositories only
+          Java, Python, JS/TS, Go, C#, Rust, C/C++, Ruby, PHP, Kotlin · public GitHub repositories only
         </p>
       </section>
 

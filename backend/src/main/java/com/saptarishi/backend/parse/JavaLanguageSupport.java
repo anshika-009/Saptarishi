@@ -42,20 +42,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class JavaLanguageSupport implements LanguageSupport {
 
-    private final JavaParser parser;
+    private static final Logger log = LoggerFactory.getLogger(JavaLanguageSupport.class);
 
-    public JavaLanguageSupport() {
+    /**
+     * A JavaParser reuses its internal state between calls, so one instance must not be used by two
+     * threads at once, and RepoParser parses files on a pool of threads. Each thread gets its own.
+     */
+    private final ThreadLocal<JavaParser> parser = ThreadLocal.withInitial(() -> {
         ParserConfiguration cfg = new ParserConfiguration();
         cfg.setLanguageLevel(LanguageLevel.JAVA_21);
         cfg.setAttributeComments(false);
         cfg.setLexicalPreservationEnabled(false);
-        this.parser = new JavaParser(cfg);
-    }
+        return new JavaParser(cfg);
+    });
 
     @Override
     public String language() { return "java"; }
@@ -64,8 +70,11 @@ public class JavaLanguageSupport implements LanguageSupport {
     public ParsedFile parse(String path, String content) {
         int loc = (int) content.lines().filter(l -> !l.isBlank()).count();
         try {
-            ParseResult<CompilationUnit> result = parser.parse(content);
+            ParseResult<CompilationUnit> result = parser.get().parse(content);
             if (!result.isSuccessful() || result.getResult().isEmpty()) {
+                // Say why, so "could not be parsed" can be traced to a cause.
+                log.warn("Java parse failed for {}: {}", path,
+                        result.getProblems().isEmpty() ? "no result" : result.getProblems().get(0).getMessage());
                 return ParsedFile.unparsed(path, language(), loc);
             }
             CompilationUnit cu = result.getResult().get();
@@ -93,6 +102,7 @@ public class JavaLanguageSupport implements LanguageSupport {
                     methods(cu), calls(cu));
         } catch (Exception | StackOverflowError e) {
             // One broken file must never fail the whole job.
+            log.warn("Java parse failed for {}: {}", path, e.toString());
             return ParsedFile.unparsed(path, language(), loc);
         }
     }

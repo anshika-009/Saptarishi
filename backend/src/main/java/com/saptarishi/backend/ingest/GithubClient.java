@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 public class GithubClient {
 
     private static final Pattern SHA = Pattern.compile("^[0-9a-f]{40}$");
-    private static final long MAX_DOWNLOAD_BYTES = 200L * 1024 * 1024;
+    private static final long MAX_DOWNLOAD_BYTES = 200L * 1024 * 1024; // 200 MB
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))

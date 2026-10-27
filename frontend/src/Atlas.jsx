@@ -162,16 +162,17 @@ const LAYOUTS = {
     flat: false,
     options: {
       name: "fcose",
-      animate: false,
+      animate: true,
+      animationDuration: 550,
       fit: true,
       padding: 40,
       randomize: false,
-      quality: "proof",
+      quality: "default",
       nodeDimensionsIncludeLabels: true,
-      nodeRepulsion: () => 60000,
-      idealEdgeLength: () => 140,
+      nodeRepulsion: () => 90000,
+      idealEdgeLength: () => 165,
       nestingFactor: 0.1,
-      nodeSeparation: 160,
+      nodeSeparation: 190,
       packComponents: true,
     },
   },
@@ -183,7 +184,8 @@ const LAYOUTS = {
       directed: true,
       spacingFactor: 1.2,
       padding: 40,
-      animate: false,
+      animate: true,
+      animationDuration: 450,
     },
   },
 };
@@ -428,7 +430,7 @@ export default function Atlas({ sha, onBack }) {
     cy.on("tap", 'node[kind = "folder"]', (evt) => {
       if (evt.target.descendants('[kind = "file"]').not(".hidden").empty())
         return;
-      cy.animate({ fit: { eles: evt.target, padding: 40 } }, { duration: 300 });
+      cy.animate({ fit: { eles: evt.target, padding: 40 } }, { duration: 420 });
     });
     const box = containerRef.current;
     const ro = new ResizeObserver(() => {

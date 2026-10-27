@@ -6,12 +6,12 @@ export const isTest = (p) => /(^|\/)tests?\//.test(p);
 // single child folder (src/main/java/org/...) are merged into one box.
 export function toElements(
   { nodes, edges },
-  { hideTests = true, analysedOnly = false } = {},
+  { hideTests = true, analysedOnly = false, analysed = new Set(["java"]) } = {},
 ) {
   const files = nodes.filter(
     (n) =>
       !n.id.endsWith("package-info.java") &&
-      !(analysedOnly && n.language !== "java") &&
+      !(analysedOnly && !analysed.has(n.language)) &&
       !(hideTests && /(^|\/)test\//.test(n.id)),
   );
   const ids = new Set(files.map((n) => n.id));
@@ -78,6 +78,7 @@ export function toElements(
         parent: p ? "dir:" + p : undefined,
         kind: "file",
         language: n.language,
+        analysed: analysed.has(n.language),
         complexity: n.complexity,
         tokens: n.tokens,
         unparsed: n.parsed === false,

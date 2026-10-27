@@ -2,7 +2,7 @@
 
 Paste a GitHub repository URL and get an interactive map of its code: files grouped by folder, import dependencies drawn as edges, and a read-only code panel with per-file metrics.
 
-Currently supports **Java**. JavaScript, TypeScript and Python are planned.
+Analyses **Java, JavaScript, TypeScript, Python, Go, C#, Rust, C, C++, Ruby, PHP and Kotlin** (see [Languages](#languages)). Files in other languages (Swift, SQL, shell, Markdown and so on) are not part of the graph.
 
 ## How it works
 
@@ -13,7 +13,7 @@ GitHub URL
 cached in Postgres for this SHA? ── yes ──► done (no download)
    │ no
    ▼
-download zip ► safe extract + filter ► parse (JavaParser) ► resolve imports ► save
+download zip ► safe extract + filter ► parse (per language) ► resolve imports ► save
    │
    ▼
 GET /api/repos/{sha}/graph  ──►  Cytoscape graph  +  Monaco code panel
@@ -23,11 +23,38 @@ GET /api/repos/{sha}/graph  ──►  Cytoscape graph  +  Monaco code panel
 - Results are keyed by commit SHA, so analysing the same commit twice is instant.
 - Extracted sources are kept on disk (`~/saptarishi-data`) so the code panel can serve files.
 
+## Languages
+
+Every language below gives the same things: imports, symbols (classes, functions), a token count, and a complexity score that uses the Java definition (one per function plus one per branch, loop, `case`, `catch`, `?:`, `&&` and `||`), so scores are comparable across languages. Imports become edges only when they resolve to a file inside the repository; library imports are ignored.
+
+| Language | Read with | An edge comes from |
+| -------- | --------- | ------------------ |
+| Java | JavaParser | `import`, and same-package references |
+| JavaScript, TypeScript | patterns | `import`, `export ... from`, `require()`, `import()` of a relative file |
+| Python | patterns | `import` and `from ... import`, absolute and relative |
+| Go | tree-sitter | an import path inside a `go.mod` module links to the files of that package folder |
+| C# | tree-sitter | `using`, and types of the same or an enclosing namespace |
+| Rust | tree-sitter | `use` and `mod`, following the crate layout |
+| C, C++ | tree-sitter | `#include`, searched in the includer's folder, then up the tree and its `include/`, `inc/` and `src/`, then by unique path ending |
+| Ruby | tree-sitter | `require_relative`, and `require` searched in `lib/` folders |
+| PHP | tree-sitter | `use` (by namespace and class) and `require`/`include` of a file |
+| Kotlin | patterns | `import` and same-package types, by the types a file mentions |
+
+"Patterns" means comments and strings are blanked and the rest is read with regular expressions, because no usable grammar is bundled. It is an approximation and can be fooled by unusual formatting.
+
+A few rules worth knowing:
+
+- A `.h` file is read as C++ only if the repository has at least as many C++ files as `.c` files; otherwise it is C.
+- `.c`/`.h` includes are matched by folder layout, not by build flags (`-I`), which a repository does not record.
+- Only Java has the method call graph.
+
+**Languages without a parser** are never an error. Files the filter does not recognise as source (Swift, SQL, shell, Markdown and so on) are kept out of the graph. A language that has a file extension mapped but no parser yet falls back to a plain node: it keeps its place in the folder tree with a line count and no edges, and the Atlas hides it by default with a button to show it. The backend lists the analysed languages at `GET /api/languages`, and the Atlas shows a line such as _"All 4 languages analysed"_ or _"3 of 4 languages analysed"_ with the file count per language.
+
 ## Tech stack
 
 | Layer    | Tools                                                      |
 | -------- | ---------------------------------------------------------- |
-| Backend  | Java 25, Spring Boot 4.1, JavaParser, Spring JDBC, Flyway  |
+| Backend  | Java 25, Spring Boot 4.1, JavaParser, tree-sitter, Spring JDBC, Flyway |
 | Database | PostgreSQL 16                                              |
 | Frontend | React 19, Vite, Cytoscape.js (fcose layout), Monaco editor |
 | Tests    | JUnit 5, Mockito, Testcontainers                           |
@@ -75,6 +102,7 @@ Do not use the default credentials outside local development.
 - **Code panel** shows read-only source with syntax highlighting, token count, complexity, line count, and clickable _Imports_ and _Imported by_ lists.
 - **Layouts:** _Clusters_ groups files by folder. _Hierarchy_ arranges them top-down with entry points (files nobody imports) on top.
 - **Search:** the top bar searches file paths and symbol names (classes, interfaces, methods). Picking a result selects and centres that node. Picking a symbol also opens the file at its line.
+- **Language line:** under the toolbar, how many of the repository's languages were analysed and how many files each has. Analysed files are tan. A language without a parser yet would be grey and hidden by default, with a button to show it.
 - **Filters:** a language dropdown and a path filter (for example `controller`) hide non-matching files without re-running the layout. Folders left empty are hidden too.
 - **Show tests** includes or hides files under `test/`. Picking a test file from search switches it on automatically.
 - **Circular imports** are outlined in red. **God files** are outlined in purple (see below). Both can be switched off with their checkboxes.
@@ -97,7 +125,7 @@ Both are computed on the fly from the stored graph. Test files are left out, bec
 
 Grades: A 85 and above, B 70, C 55, D 40, F below.
 
-The thresholds are a judgement call, tuned on a few real Java codebases (React Native's Android layer and its sub-packages, Capacitor, Cordova). On those the score ranged from the 50s to the low 90s, and well-factored packages scored higher than tangled ones. The complexity and coupling thresholds are the least tested, since those repositories were all similar on those two measures. The score is a heuristic for comparing and for finding things to look at, not a measurement of quality. All constants are at the top of `HealthScore.java`.
+The thresholds are a judgement call, tuned on a few real Java codebases (React Native's Android layer and its sub-packages, Capacitor, Cordova); other languages use the same numbers, untuned. On those the score ranged from the 50s to the low 90s, and well-factored packages scored higher than tangled ones. The complexity and coupling thresholds are the least tested, since those repositories were all similar on those two measures. The score is a heuristic for comparing and for finding things to look at, not a measurement of quality. All constants are at the top of `HealthScore.java`.
 
 ## API
 
@@ -105,6 +133,7 @@ The thresholds are a judgement call, tuned on a few real Java codebases (React N
 | ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `POST` | `/api/repos`                  | Body `{"url": "..."}`. Starts an analysis. Returns `200` with a finished job if the commit is already cached, otherwise `202`.             |
 | `GET`  | `/api/jobs/{id}`              | Job state: `jobId`, `sha`, `state` (`QUEUED`, `RUNNING`, `DONE`, `FAILED`), `stage`, `progress`, `error`.                                  |
+| `GET`  | `/api/languages`              | `{"analysed": [...]}`: the languages that have a parser.                                                                                  |
 | `GET`  | `/api/repos/{sha}/graph`      | The stored graph: `nodes` (path, folder, language, complexity, tokens, loc) and `edges`.                                                   |
 | `GET`  | `/api/repos/{sha}/file?path=` | Source text plus metrics, `imports` and `importedBy`. `404` if unknown, `410` if the cached source was removed.                            |
 | `GET`  | `/api/repos/{sha}/analysis`   | Circular-import groups, plus per-file fan-in, fan-out and blast radius.                                                                    |
@@ -121,8 +150,8 @@ Development-only endpoints under `/api/dev/**` and a demo graph exist for debugg
 backend/src/main/java/com/saptarishi/backend/
 ├── api/      REST controllers and error handling
 ├── ingest/   GitHub client, safe unzip, file filter, per-SHA extraction cache
-├── parse/    Language support (Java today), parser registry, parsed-file model
-├── graph/    Import resolution, graph building, PostgreSQL persistence
+├── parse/    One class per language (JavaParser, tree-sitter or patterns), parser registry, parsed-file model
+├── graph/    Import resolution per language, graph building, PostgreSQL persistence
 ├── job/      Background jobs and progress tracking
 ├── file/     Source and metrics for the code panel
 └── search/   File and symbol search
@@ -160,12 +189,14 @@ cd backend
 ./mvnw test
 ```
 
-Docker must be running: the database tests start PostgreSQL through Testcontainers. The suite covers URL parsing, safe extraction, the Java parser, import resolution, graph persistence, graph analysis, the health score, the file endpoint and search.
+Docker must be running: the database tests start PostgreSQL through Testcontainers. The suite covers URL parsing, safe extraction, the language parsers, import resolution, graph persistence, graph analysis, the health score, the file endpoint and search.
 
 ## Known limitations
 
 - Search covers source files in the graph only, not text files.
-- Only Java is parsed. Other source languages appear in the file index but not in the graph.
+- Files in languages without a parser (see [Languages](#languages)) are not in the graph.
+- Include and import resolution is heuristic for C/C++, Ruby and PHP (no build flags, no Composer autoload map), so some edges may be missing, and the call graph is Java only.
+- Case-insensitive file systems are not modelled: `#include "Foo.H"` will not find `foo.h`.
 - Only imports that resolve to files inside the repository become edges. Library imports are ignored.
 - Public GitHub repositories only.
 - Jobs are kept in memory, so they are lost on restart. Finished graphs stay in the database.
@@ -183,6 +214,6 @@ Docker must be running: the database tests start PostgreSQL through Testcontaine
 - [x] Search and filters
 - [x] Health score and god files
 - [ ] Churn (needs git history, via JGit)
-- [ ] JavaScript, TypeScript and Python support
+- [x] Multi-language support: JavaScript, TypeScript, Python, Go, C#, Rust, C, C++, Ruby, PHP, Kotlin
 - [ ] Hardening: zip-bomb tests, error handling, timing benchmarks
 - [ ] Zip upload and a visual redesign
