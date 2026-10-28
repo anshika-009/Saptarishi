@@ -94,4 +94,26 @@ class JavaLanguageSupportTest {
         assertFalse(p.parsed());
         assertTrue(p.imports().isEmpty());
     }
+
+    @Test void stringLiteralIsOneToken() {
+        ParsedFile a = java.parse("A.java", "class A { String s = \"x\"; }");
+        ParsedFile b = java.parse("A.java", "class A { String s = \"a longer text with \\n escapes\"; }");
+        assertEquals(a.tokens(), b.tokens());
+    }
+
+    @Test void nestedLambdaAndAnonymousClassCountInTheirMethod() {
+        String src = """
+            class A {
+                void f(boolean a, boolean b) {
+                    Runnable r = () -> { if (a) g(); };           // +1
+                    new Thread() { public void run() { if (a && b) g(); } };  // +2
+                }
+                void g() {}
+            }
+            """;
+        ParsedFile p = java.parse("A.java", src);
+        // f = 1 + 3, run = 1 + 2, g = 1; the file is the sum, as before
+        assertEquals(4, p.methods().stream().filter(m -> m.name().equals("f")).findFirst().get().complexity());
+        assertEquals(8, p.complexity());
+    }
 }
