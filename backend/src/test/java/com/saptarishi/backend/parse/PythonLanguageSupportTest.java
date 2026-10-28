@@ -80,4 +80,36 @@ class PythonLanguageSupportTest {
         ParsedFile p = py.parse("x.py", "notify = original_form + order\nelse_value = 1\n");
         assertEquals(0, p.complexity());
     }
+
+    @Test void stringsAreOneTokenAndNothingInsideThemCounts() {
+        ParsedFile a = py.parse("x.py", "s = f\"{a if b else c}\"\n");
+        ParsedFile b = py.parse("x.py", "s = 'plain'\n");
+        assertEquals(0, a.complexity());
+        assertEquals(b.tokens(), a.tokens());
+    }
+
+    @Test void decoratedAndNestedDefsAreSymbolsOnTheNameLine() {
+        String src = "@decorator\ndef outer():\n    def inner():\n        pass\n";
+        ParsedFile p = py.parse("x.py", src);
+        assertTrue(p.symbols().contains(new ParsedFile.Symbol("outer", "METHOD", 2)));
+        assertTrue(p.symbols().contains(new ParsedFile.Symbol("inner", "METHOD", 3)));
+        assertEquals(2, p.complexity()); // two defs
+    }
+
+    @Test void conditionalExpressionAndMatchGuardCount() {
+        String src = "def f(x):\n    y = 1 if x else 2\n    match x:\n        case n if n > 0:\n            pass\n";
+        // def + conditional + case + guard = 4
+        assertEquals(4, py.parse("x.py", src).complexity());
+    }
+
+    @Test void futureImportAndDuplicatesAreReportedOnce() {
+        String src = "from __future__ import annotations\nimport os\nimport os\nfrom os import path\n";
+        assertEquals(List.of("__future__", "__future__.annotations", "os", "os.path"), names(py.parse("x.py", src)));
+    }
+
+    @Test void aFileWithASyntaxErrorIsStillRead() {
+        ParsedFile p = py.parse("x.py", "import ok\ndef broken(:\n    pass\n");
+        assertTrue(p.parsed());
+        assertEquals(List.of("ok"), names(p));
+    }
 }
