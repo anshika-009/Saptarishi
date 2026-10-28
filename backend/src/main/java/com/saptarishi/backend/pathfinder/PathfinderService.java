@@ -4,6 +4,7 @@ import com.saptarishi.backend.graph.GraphBuilder.Graph;
 import com.saptarishi.backend.graph.GraphBuilder.GraphEdge;
 import com.saptarishi.backend.graph.GraphRepository;
 import com.saptarishi.backend.graph.HealthScore;
+import com.saptarishi.backend.parse.SymbolKinds;
 import com.saptarishi.backend.pathfinder.IssueMapper.Confidence;
 import com.saptarishi.backend.pathfinder.IssueSource.Issue;
 import java.io.IOException;
@@ -108,7 +109,7 @@ public class PathfinderService {
             complexity.put(r.path(), r.complexity());
         }
         List<IssueMapper.Symbol> symbols = jdbc.query(
-                "select name, kind, path from symbol where sha = ? and kind in ('CLASS','INTERFACE','ENUM','RECORD','METHOD')",
+                "select name, kind, path from symbol where sha = ? and kind in (" + SymbolKinds.nameableSql() + ")",
                 (rs, i) -> new IssueMapper.Symbol(rs.getString(1), rs.getString(2), rs.getString(3)), sha);
         List<GraphEdge> edges = jdbc.query("select source, target, type from edge where sha = ?",
                 (rs, i) -> new GraphEdge(rs.getString(1), rs.getString(2), rs.getString(3)), sha);

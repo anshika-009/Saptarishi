@@ -175,25 +175,38 @@ public final class HealthScore {
         return "F";
     }
 
-    /** Test files: anything under a test/, tests/ or __tests__/ folder, plus *.test.* / *.spec.* scripts and Python test_*.py, *_test.py, conftest.py. */
+    /**
+     * Test files, by the conventions of each supported language: a test/, tests/, spec/ or __tests__/ folder,
+     * and by name {@code *.test.ts}, {@code test_x.py}, {@code x_test.go}, {@code x_test.rs},
+     * {@code FooTest.java/.kt/.cs/.php}, {@code foo_spec.rb}, {@code foo_test.cc} and the like.
+     */
     public static boolean isTestPath(String id) {
         String path = "/" + id;
-        if (path.matches("(?i).*/(tests?|__tests__)/.*")) return true;
+        if (path.matches("(?i).*/(tests?|specs?|__tests__|__mocks__)/.*")) return true;
         if (path.matches("(?i).*/[^/]*\\.(unit|integration)?tests?/.*")) return true; // C#: MyApp.Tests/
         String name = path.substring(path.lastIndexOf('/') + 1);
-        return name.matches(".+\\.(test|spec)\\.[cm]?[jt]sx?")
-                || name.matches("test_.+\\.py") || name.matches(".+_test\\.py")
-                || name.equals("conftest.py") || name.endsWith("_test.go")
-                || name.matches("(.*[a-z0-9])?Tests?\\.cs")
-                || name.equals("tests.rs") || name.endsWith("_test.rs") || name.endsWith("_tests.rs");
+        return name.matches(".+\\.(test|spec)\\.[cm]?[jt]sx?")                                      // JS, TS
+                || name.matches("test_.+\\.py") || name.matches(".+_test\\.py")                      // Python
+                || name.equals("conftest.py")
+                || name.endsWith("_test.go")                                                          // Go
+                || name.equals("tests.rs") || name.endsWith("_test.rs") || name.endsWith("_tests.rs") // Rust
+                || name.matches("(.*[a-z0-9])?(Tests?|IT)\\.(java|kt|kts|cs|php)")                     // Java, Kotlin, C#, PHP
+                || name.matches(".+Spec\\.kt")                                                       // Kotlin (Kotest, Spek)
+                || name.matches(".+_(spec|test)\\.rb") || name.matches("test_.+\\.rb")                // Ruby
+                || name.matches("(.*[a-z0-9])?Tests?\\.(c|cc|cpp|cxx)")                               // C, C++ (gtest)
+                || name.matches(".+_(unit)?tests?\\.(c|cc|cpp|cxx)")
+                || name.matches("test_.+\\.(c|cc|cpp|cxx)");
     }
 
     /** Files that carry no logic and would only distort the percentiles. */
     public static boolean isBoilerplate(String id) {
+        String name = id.substring(id.lastIndexOf('/') + 1);
         return id.endsWith("package-info.java") || id.endsWith("module-info.java") || id.endsWith(".d.ts")
-                || id.endsWith(".pb.go")
+                || id.endsWith(".pb.go") || name.endsWith("_generated.go") || name.startsWith("zz_generated")
                 || id.endsWith(".Designer.cs") || id.endsWith(".g.cs") || id.endsWith(".g.i.cs")
-                || id.endsWith("AssemblyInfo.cs");
+                || id.endsWith("AssemblyInfo.cs")
+                || name.endsWith("_pb2.py") || name.endsWith("_pb2_grpc.py")
+                || name.endsWith(".pb.cc") || name.endsWith(".pb.h");
     }
 
     /**

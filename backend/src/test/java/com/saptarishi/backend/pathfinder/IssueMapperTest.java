@@ -75,4 +75,88 @@ class IssueMapperTest {
         assertTrue(mapper.map("the owner and vet lists").isEmpty());
         assertTrue(mapper.map("see e.g. version 1.5 at github.com").isEmpty());
     }
+
+    // ---- the same mapping for other languages: nothing about it is Java ----
+
+    private static final String PY = "app/services/billing.py";
+    private static final String RB = "lib/shop/cart.rb";
+    private static final String GO = "internal/server/handler.go";
+    private static final String CS = "src/Shop/OrderService.cs";
+    private static final String RS = "src/parser/lexer.rs";
+    private static final String KT = "src/main/kotlin/shop/Basket.kt";
+
+    private final IssueMapper polyglot = new IssueMapper(
+            List.of(PY, RB, GO, CS, RS, KT),
+            List.of(new Symbol("Invoice", "CLASS", PY),
+                    new Symbol("compute_late_fee", "METHOD", PY),
+                    new Symbol("Cart", "CLASS", RB),
+                    new Symbol("apply_coupon", "METHOD", RB),
+                    new Symbol("Handler", "CLASS", GO),
+                    new Symbol("ServeRequest", "METHOD", GO),          // Go: an exported function is PascalCase
+                    new Symbol("Retry", "METHOD", GO),
+                    new Symbol("PlaceOrder", "METHOD", CS),
+                    new Symbol("Lexer", "CLASS", RS),
+                    new Symbol("next_token", "METHOD", RS),
+                    new Symbol("Tokenizer", "INTERFACE", RS),          // a Rust trait
+                    new Symbol("addItem", "METHOD", KT),
+                    new Symbol("render", "METHOD", PY),
+                    new Symbol("render", "METHOD", KT)));
+
+    private Optional<Match> poly(String text, String path) {
+        return polyglot.map(text).stream().filter(m -> m.path().equals(path)).findFirst();
+    }
+
+    @Test
+    void snakeCaseMethodsAreFoundForPythonRubyAndRust() {
+        assertEquals(Confidence.LOW, poly("compute_late_fee rounds the wrong way", PY).orElseThrow().confidence());
+        assertEquals(Confidence.LOW, poly("apply_coupon ignores expiry", RB).orElseThrow().confidence());
+        assertEquals("mentions method next_token()", poly("panic in next_token on empty input", RS).orElseThrow().reason());
+    }
+
+    @Test
+    void pascalCaseFunctionsAreFoundForGoAndCSharp() {
+        Match go = poly("ServeRequest hangs when the body is empty", GO).orElseThrow();
+        assertEquals(Confidence.LOW, go.confidence());
+        assertEquals("mentions method ServeRequest()", go.reason());
+        assertEquals(Confidence.LOW, poly("PlaceOrder throws a NullReferenceException", CS).orElseThrow().confidence());
+    }
+
+    @Test
+    void aNameWrittenAsACallIsFoundHoweverShort() {
+        assertEquals(Confidence.LOW, poly("Retry() is never called", GO).orElseThrow().confidence());
+        assertTrue(polyglot.map("we should retry later").isEmpty()); // prose, not a call
+        assertTrue(polyglot.map("render() is slow").isEmpty());      // two files declare render
+    }
+
+    @Test
+    void traitsStructsAndTypesOfAnyLanguageAreMedium() {
+        assertEquals(Confidence.MEDIUM, poly("Invoice totals are off", PY).orElseThrow().confidence());
+        assertEquals(Confidence.MEDIUM, poly("Tokenizer should be object safe", RS).orElseThrow().confidence());
+        assertEquals(Confidence.MEDIUM, poly("Cart is empty after login", RB).orElseThrow().confidence());
+    }
+
+    @Test
+    void stackFramesOfOtherLanguagesAreHigh() {
+        String python = "File \"app/services/billing.py\", line 88, in compute_late_fee";
+        Match py = poly(python, PY).orElseThrow();
+        assertEquals(Confidence.HIGH, py.confidence());
+        assertTrue(py.reason().startsWith("stack frame"));
+
+        assertEquals(Confidence.HIGH, poly("   at Shop.OrderService.PlaceOrder() in C:\\src\\OrderService.cs:line 57", CS)
+                .orElseThrow().confidence());
+        assertEquals(Confidence.HIGH, poly(" --> src/parser/lexer.rs:12:5", RS).orElseThrow().confidence());
+        assertEquals(Confidence.HIGH, poly("handler.go:140 +0x1d", GO).orElseThrow().confidence());
+        assertEquals(Confidence.HIGH, poly("cart.rb:31:in `apply_coupon'", RB).orElseThrow().confidence());
+    }
+
+    @Test
+    void aCommaAfterAFileNameIsNotAStackFrame() {
+        Match m = poly("changes to lexer.rs, 3 files in total", RS).orElseThrow();
+        assertEquals(Confidence.MEDIUM, m.confidence());
+    }
+
+    @Test
+    void symbolKindsAreSharedWithTheQueryThatLoadsThem() {
+        assertEquals("'CLASS','ENUM','INTERFACE','METHOD','RECORD'", com.saptarishi.backend.parse.SymbolKinds.nameableSql());
+    }
 }
