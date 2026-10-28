@@ -22,6 +22,7 @@ public class RepoIngestor {
                                Path sourceDir, List<IndexedFile> files) {}
 
     @FunctionalInterface
+    //Defines a function that fetches or prepares a ZIP file at a given path.
     private interface Fetcher {
         void fetch(Path zip) throws IOException;
     }

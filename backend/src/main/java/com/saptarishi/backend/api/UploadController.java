@@ -38,7 +38,7 @@ public class UploadController {
         if (file.isEmpty() || original == null || !original.toLowerCase().endsWith(".zip")) {
             throw new IllegalArgumentException("Please upload a .zip file");
         }
-
+        
         Path tmp = Files.createTempFile("saptarishi-upload-", ".zip");
         String sha;
         try {
