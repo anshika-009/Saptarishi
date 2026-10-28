@@ -1050,3 +1050,251 @@ body:has(.atlas) {
     width: min(260px, calc(100vw - 80px));
   }
 }
+
+/* ===== Layout: graph | dock, with the call graph docked under the graph ===== */
+.main-col {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-col > .canvas-wrap {
+  flex: 1 1 0;
+  min-height: 160px;
+}
+.call-dock {
+  flex: 0 0 clamp(240px, 38%, 420px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+/* The dock holds the code, "Where to start", cycles and rankings as tabs. */
+.dock {
+  position: relative;
+  flex: 0 0 clamp(340px, 32vw, 480px);
+  min-width: 0;
+  max-width: 70%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+}
+.dock-resizer {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 5;
+}
+.dock-resizer:hover,
+.dock-resizer:active {
+  background: linear-gradient(90deg, transparent 2px, var(--line) 2px, var(--line) 4px, transparent 4px);
+}
+.dock-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  flex: none;
+}
+.dock-tab {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.dock-tab[data-active="true"] {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: inset 0 2px 0 var(--accent2);
+}
+.dock-tab button {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  font-size: 13px;
+  color: var(--mute);
+}
+.dock-tab[data-active="true"] button {
+  color: var(--ink);
+  font-weight: 600;
+}
+.dock-tab .dock-x {
+  width: 22px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.55;
+}
+.dock-tab .dock-x:hover {
+  opacity: 1;
+}
+.dock-panes {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+}
+.dock-pane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.dock-pane[hidden] {
+  display: none;
+}
+.dock-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* cycle + ranking panels were floating cards; inside the dock they fill it */
+.dock .side-panel {
+  position: static;
+  width: auto;
+  max-width: none;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+}
+.dock .side-head {
+  display: none;
+}
+
+/* ===== Code panel header and collapsible sections ===== */
+.code-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+.code-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-title span {
+  font-size: 11px;
+  color: var(--mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.sect {
+  border-top: 1px solid var(--line-soft);
+  padding: 2px 0;
+}
+.sect summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 0;
+  list-style: none;
+}
+.sect summary::-webkit-details-marker {
+  display: none;
+}
+.sect summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 12px;
+  color: var(--mute);
+  transition: transform 0.12s;
+}
+.sect[open] summary::before {
+  transform: rotate(90deg);
+}
+.sect .count {
+  font-weight: 500;
+  color: var(--mute);
+  margin-left: 2px;
+}
+.sect .sect-hint {
+  font-weight: 400;
+  color: var(--mute);
+}
+.sect-list {
+  max-height: 150px;
+  overflow: auto;
+  padding: 0 0 6px 12px;
+}
+.linkish {
+  display: block;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  padding: 2px 0;
+  height: auto;
+  font-size: 12px;
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
+}
+.linkish:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .dock {
+    position: absolute;
+    z-index: 8;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(94vw, 480px);
+    max-width: 100%;
+    flex: none;
+    box-shadow: -8px 0 24px rgba(23, 21, 15, 0.16);
+  }
+  .dock-resizer {
+    display: none;
+  }
+}
+
+/* compact header of the code panel: four stats on one row, one scroll area */
+.code-panel-details .tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.code-panel-details .tile {
+  padding: 4px 6px;
+}
+.code-panel-details .tile span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sect-list {
+  max-height: none;
+  overflow: visible;
+}
+.sect-list .linkish {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  padding: 2px 0;
+  height: auto;
+  border-radius: 0;
+}

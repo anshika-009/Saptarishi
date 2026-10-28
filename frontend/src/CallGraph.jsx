@@ -83,6 +83,7 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
     if (!data) return;
     const cy = cytoscape({
       container: boxRef.current,
+      maxZoom: 1.3,
       style: STYLE,
       layout: LAYOUT,
       elements: [
@@ -110,28 +111,22 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
       const d = evt.target.data();
       openRef.current({ id: d.id, path: d.path, line: d.line });
     });
-    return () => cy.destroy();
+    // The panel is docked under the graph and can change size: keep the diagram fitted to it.
+    const ro = new ResizeObserver(() => {
+      cy.resize();
+      cy.fit(undefined, 30);
+    });
+    ro.observe(boxRef.current);
+    return () => {
+      ro.disconnect();
+      cy.destroy();
+    };
   }, [data]);
 
   const rootNode = data?.nodes.find((n) => n.id === data.root);
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: 8,
-        right: 8,
-        bottom: 8,
-        height: "55%",
-        zIndex: 4,
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: 10,
-        boxShadow: "var(--shadow)",
-      }}
-    >
+    <section className="call-dock" aria-label="Call graph">
       <div
         style={{
           display: "flex",
@@ -194,6 +189,6 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
         node to open it and re-centre.
         {data?.truncated && " Showing the first 120 methods only."}
       </div>
-    </div>
+    </section>
   );
 }

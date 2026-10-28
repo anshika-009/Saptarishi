@@ -117,7 +117,7 @@ function StarterRow({ s, onNavigate }) {
   );
 }
 
-export default function PathfinderPanel({ sha, onNavigate, onClose }) {
+export default function PathfinderPanel({ sha, onNavigate }) {
   const [state, setState] = useState({ sha: null });
   const [tab, setTab] = useState(null);
 
@@ -157,35 +157,7 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
   );
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 12,
-        right: 8,
-        bottom: 8,
-        width: 400,
-        zIndex: 3,
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: 10,
-        boxShadow: "var(--shadow)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px 0",
-        }}
-      >
-        <strong>Where to start</strong>
-        <button onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </div>
+    <div className="dock-fill">
       <div
         style={{
           padding: "0 12px",
@@ -210,7 +182,9 @@ export default function PathfinderPanel({ sha, onNavigate, onClose }) {
           padding: "0 12px 8px",
         }}
       >
-        {error && <p style={{ color: "var(--bad)" }}>Could not load: {error}</p>}
+        {error && (
+          <p style={{ color: "var(--bad)" }}>Could not load: {error}</p>
+        )}
         {!data && !error && (
           <p style={{ color: "var(--mute)" }}>Looking at open issues…</p>
         )}

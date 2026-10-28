@@ -215,6 +215,15 @@ export default function Atlas({ sha, onBack }) {
   const [focusTick, setFocusTick] = useState(0);
   const [showCycleList, setShowCycleList] = useState(false);
   const [showRank, setShowRank] = useState(false);
+  // Side panels share one dock as tabs, so nothing covers the graph or another panel.
+  const [dockPick, setDockPick] = useState(null);
+  const [dockWidth, setDockWidth] = useState(() => {
+    try {
+      return Number(localStorage.getItem("saptarishi-dock")) || null;
+    } catch {
+      return null;
+    }
+  });
   const [guide, setGuide] = useState(() => {
     try {
       return !localStorage.getItem("saptarishi-guide");
@@ -233,6 +242,65 @@ export default function Atlas({ sha, onBack }) {
       /* storage unavailable */
     }
   };
+  // Whatever was opened last comes to the front (adjusted during render, not in an effect).
+  const [seen, setSeen] = useState({});
+  const now = {
+    code: selection,
+    start: showPath,
+    cycles: showCycleList,
+    rank: showRank,
+  };
+  if (Object.keys(now).some((k) => seen[k] !== now[k])) {
+    setSeen(now);
+    for (const k of ["code", "start", "cycles", "rank"]) {
+      if (now[k] && seen[k] !== now[k]) setDockPick(k);
+    }
+  }
+  const dockTabs = [
+    selection && { id: "code", label: "Code", close: () => setSelection(null) },
+    showPath && {
+      id: "start",
+      label: "Where to start",
+      close: () => setShowPath(false),
+    },
+    showCycleList &&
+      analysis && {
+        id: "cycles",
+        label: "Cycles",
+        close: () => setShowCycleList(false),
+      },
+    showRank && {
+      id: "rank",
+      label: "Rankings",
+      close: () => setShowRank(false),
+    },
+  ].filter(Boolean);
+  const dockActive = dockTabs.some((t) => t.id === dockPick)
+    ? dockPick
+    : dockTabs[dockTabs.length - 1]?.id;
+  const startResize = (e) => {
+    e.preventDefault();
+    const body = e.currentTarget.parentElement.parentElement;
+    const total = body.getBoundingClientRect().width;
+    const move = (ev) => {
+      const w = total - (ev.clientX - body.getBoundingClientRect().left);
+      setDockWidth(Math.round(Math.max(320, Math.min(total * 0.7, w))));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  useEffect(() => {
+    if (!dockWidth) return;
+    try {
+      localStorage.setItem("saptarishi-dock", String(dockWidth));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [dockWidth]);
   const languages = useMemo(
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
     [data],
@@ -242,7 +310,9 @@ export default function Atlas({ sha, onBack }) {
     if (!data) return null;
     const by = {};
     for (const n of data.nodes) by[n.language] = (by[n.language] || 0) + 1;
-    const parsedCount = data.nodes.filter((n) => analysed.has(n.language)).length;
+    const parsedCount = data.nodes.filter((n) =>
+      analysed.has(n.language),
+    ).length;
     return {
       by,
       parsedCount,
@@ -633,13 +703,12 @@ export default function Atlas({ sha, onBack }) {
         </span>
         <button
           className="primary"
+          aria-pressed={showPath}
           onClick={() => {
-            setShowCycleList(false);
-            setShowRank(false);
             setShowPath((v) => !v);
           }}
         >
-          {showPath ? "Hide suggestions" : "Where to start"}
+          Where to start
         </button>
         <button
           className="icon-btn"
@@ -668,8 +737,6 @@ export default function Atlas({ sha, onBack }) {
             aria-pressed={showCycleList}
             title="List every circular import and the files in it"
             onClick={() => {
-              setShowPath(false);
-              setShowRank(false);
               setShowCycleList((v) => !v);
             }}
           >
@@ -699,8 +766,6 @@ export default function Atlas({ sha, onBack }) {
           title="Hottest files from git history, and the files most others depend on"
           onClick={() => {
             const next = !showRank;
-            setShowPath(false);
-            setShowCycleList(false);
             setShowRank(next);
             if (next) setShowHeat(true);
           }}
@@ -785,144 +850,122 @@ export default function Atlas({ sha, onBack }) {
       {stats && stats.parsedCount > 0 && stats.edges === 0 && (
         <div className="notice" role="alert">
           <span>
-            {stats.parsedCount} source files were found but no imports between them could
-            be matched to files in this repository, so there are no arrows.
+            {stats.parsedCount} source files were found but no imports between
+            them could be matched to files in this repository, so there are no
+            arrows.
           </span>
         </div>
       )}
       <div className="atlas-body">
-        <div className="canvas-wrap">
-          {error && (
-            <p
-              style={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                zIndex: 1,
-                color: "var(--bad)",
-                margin: 0,
-              }}
-            >
-              Could not load graph: {error}
-            </p>
-          )}
-          <div ref={containerRef} className="graph" />
-          {!data && !error && (
-            <div className="loading" role="status">
-              <span className="spinner" />
-              Drawing the map…
-            </div>
-          )}
-          {data && hint && !selection && (
-            <div className="hint" role="note">
-              <span>
-                Click a file to inspect it, or a folder to zoom into it. Scroll
-                to zoom, drag to pan.
-              </span>
-              <button onClick={() => setHint(false)} aria-label="Dismiss tip">
-                ×
-              </button>
-            </div>
-          )}
-          {hover && (
-            <div className="tip" style={{ left: hover.x, top: hover.y }}>
-              {hover.id.split("/").pop()}
-              <small>complexity {hover.complexity} · click to open</small>
-            </div>
-          )}
-          <div className="overlay-tl">
-            <div className="zoom">
-              <button
-                onClick={() => zoomBy(1.25)}
-                aria-label="Zoom in"
-                title="Zoom in"
+        <div className="main-col">
+          <div className="canvas-wrap">
+            {error && (
+              <p
+                style={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  zIndex: 1,
+                  color: "var(--bad)",
+                  margin: 0,
+                }}
               >
-                +
-              </button>
-              <button
-                onClick={() => zoomBy(0.8)}
-                aria-label="Zoom out"
-                title="Zoom out"
-              >
-                −
-              </button>
-              <button
-                onClick={fit}
-                aria-label="Fit to screen"
-                title="Fit to screen"
-              >
-                ⤢
-              </button>
-            </div>
-            <button
-              className="legend-toggle"
-              aria-expanded={legend}
-              onClick={() => setLegend((v) => !v)}
-            >
-              Legend {legend ? "▾" : "▸"}
-            </button>
-            {legend && (
-              <div className="legend">
-                <Lg sw="dot">File. Bigger = more complex.</Lg>
-                <Lg sw="box">Folder.</Lg>
-                <Lg sw="out">
-                  Solid arrow: A imports B. Selected file: black = it uses, red
-                  = uses it.
-                </Lg>
-                <Lg sw="ref">
-                  Dashed arrow: A uses B from the same package (no import
-                  needed).
-                </Lg>
-                {stats && stats.unparsed > 0 && (
-                  <Lg sw="unp">Dashed outline: file could not be parsed.</Lg>
-                )}
-                {showCycles && <Lg sw="cyc">Circular import loop.</Lg>}
-                {showGods && (
-                  <Lg sw="god">God file: big, complex, widely connected.</Lg>
-                )}
-                {showHeat && (
-                  <>
-                    <Lg sw="heat">
-                      Pale = stable, deep red = changes often and complex.
-                    </Lg>
-                    {churn && (
-                      <div className="legend-note">
-                        {churn.available
-                          ? `Based on the last ${churn.commitsExamined} commits.`
-                          : churn.reason}
-                      </div>
-                    )}
-                  </>
-                )}
+                Could not load graph: {error}
+              </p>
+            )}
+            <div ref={containerRef} className="graph" />
+            {!data && !error && (
+              <div className="loading" role="status">
+                <span className="spinner" />
+                Drawing the map…
               </div>
             )}
+            {data && hint && !selection && (
+              <div className="hint" role="note">
+                <span>
+                  Click a file to inspect it, or a folder to zoom into it.
+                  Scroll to zoom, drag to pan.
+                </span>
+                <button onClick={() => setHint(false)} aria-label="Dismiss tip">
+                  ×
+                </button>
+              </div>
+            )}
+            {hover && (
+              <div className="tip" style={{ left: hover.x, top: hover.y }}>
+                {hover.id.split("/").pop()}
+                <small>complexity {hover.complexity} · click to open</small>
+              </div>
+            )}
+            <div className="overlay-tl">
+              <div className="zoom">
+                <button
+                  onClick={() => zoomBy(1.25)}
+                  aria-label="Zoom in"
+                  title="Zoom in"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => zoomBy(0.8)}
+                  aria-label="Zoom out"
+                  title="Zoom out"
+                >
+                  −
+                </button>
+                <button
+                  onClick={fit}
+                  aria-label="Fit to screen"
+                  title="Fit to screen"
+                >
+                  ⤢
+                </button>
+              </div>
+              <button
+                className="legend-toggle"
+                aria-expanded={legend}
+                onClick={() => setLegend((v) => !v)}
+              >
+                Legend {legend ? "▾" : "▸"}
+              </button>
+              {legend && (
+                <div className="legend">
+                  <Lg sw="dot">File. Bigger = more complex.</Lg>
+                  <Lg sw="box">Folder.</Lg>
+                  <Lg sw="out">
+                    Solid arrow: A imports B. Selected file: black = it uses,
+                    red = uses it.
+                  </Lg>
+                  <Lg sw="ref">
+                    Dashed arrow: A uses B from the same package (no import
+                    needed).
+                  </Lg>
+                  {stats && stats.unparsed > 0 && (
+                    <Lg sw="unp">Dashed outline: file could not be parsed.</Lg>
+                  )}
+                  {showCycles && <Lg sw="cyc">Circular import loop.</Lg>}
+                  {showGods && (
+                    <Lg sw="god">God file: big, complex, widely connected.</Lg>
+                  )}
+                  {showHeat && (
+                    <>
+                      <Lg sw="heat">
+                        Pale = stable, deep red = changes often and complex.
+                      </Lg>
+                      {churn && (
+                        <div className="legend-note">
+                          {churn.available
+                            ? `Based on the last ${churn.commitsExamined} commits.`
+                            : churn.reason}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <HealthPanel health={health} onNavigate={navigate} />
           </div>
-          <HealthPanel health={health} onNavigate={navigate} />
-          {showCycleList && analysis && (
-            <CyclePanel
-              cycles={analysis.cycles}
-              edges={data?.edges ?? []}
-              onFocus={focusCycle}
-              onOpen={navigate}
-              onClose={() => setShowCycleList(false)}
-            />
-          )}
-          {showRank && (
-            <InsightsPanel
-              churn={churn}
-              analysis={analysis}
-              hideTests={hideTests}
-              onOpen={navigate}
-              onClose={() => setShowRank(false)}
-            />
-          )}
-          {showPath && (
-            <PathfinderPanel
-              sha={sha}
-              onNavigate={navigate}
-              onClose={() => setShowPath(false)}
-            />
-          )}
           {callRoot && (
             <CallGraph
               sha={sha}
@@ -932,25 +975,93 @@ export default function Atlas({ sha, onBack }) {
             />
           )}
         </div>
-        {selection && (
-          <aside className="code-panel">
-            <CodePanel
-              sha={sha}
-              path={selection.id}
-              line={selection.line}
-              metrics={metricsById.get(selection.id)}
-              cycle={cycleOf.get(selection.id)}
-              god={godById.get(selection.id)}
-              heat={
-                showHeat && churn?.available
-                  ? heatById.get(selection.id)
-                  : undefined
-              }
-              commitsExamined={churn?.commitsExamined}
-              onNavigate={navigate}
-              onMethod={openMethod}
-              onClose={() => setSelection(null)}
+        {dockTabs.length > 0 && (
+          <aside
+            className="dock"
+            style={dockWidth ? { flexBasis: dockWidth } : undefined}
+          >
+            <div
+              className="dock-resizer"
+              onPointerDown={startResize}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize panel"
             />
+            <div className="dock-tabs" role="tablist">
+              {dockTabs.map((t) => (
+                <span
+                  key={t.id}
+                  className="dock-tab"
+                  data-active={t.id === dockActive}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={t.id === dockActive}
+                    onClick={() => setDockPick(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                  <button
+                    type="button"
+                    className="dock-x"
+                    aria-label={`Close ${t.label}`}
+                    onClick={t.close}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="dock-panes">
+              {selection && (
+                <div className="dock-pane" hidden={dockActive !== "code"}>
+                  <CodePanel
+                    sha={sha}
+                    path={selection.id}
+                    line={selection.line}
+                    metrics={metricsById.get(selection.id)}
+                    cycle={cycleOf.get(selection.id)}
+                    god={godById.get(selection.id)}
+                    heat={
+                      showHeat && churn?.available
+                        ? heatById.get(selection.id)
+                        : undefined
+                    }
+                    commitsExamined={churn?.commitsExamined}
+                    onNavigate={navigate}
+                    onMethod={openMethod}
+                  />
+                </div>
+              )}
+              {showPath && (
+                <div className="dock-pane" hidden={dockActive !== "start"}>
+                  <PathfinderPanel sha={sha} onNavigate={navigate} />
+                </div>
+              )}
+              {showCycleList && analysis && (
+                <div className="dock-pane" hidden={dockActive !== "cycles"}>
+                  <CyclePanel
+                    cycles={analysis.cycles}
+                    edges={data?.edges ?? []}
+                    onFocus={focusCycle}
+                    onOpen={navigate}
+                    onClose={() => setShowCycleList(false)}
+                  />
+                </div>
+              )}
+              {showRank && (
+                <div className="dock-pane" hidden={dockActive !== "rank"}>
+                  <InsightsPanel
+                    churn={churn}
+                    analysis={analysis}
+                    hideTests={hideTests}
+                    onOpen={navigate}
+                    onClose={() => setShowRank(false)}
+                  />
+                </div>
+              )}
+            </div>
           </aside>
         )}
       </div>

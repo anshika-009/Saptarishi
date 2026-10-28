@@ -7,33 +7,26 @@ const name = (p) => p.split("/").pop();
 
 // Languages with a parser. Others are shown as plain files until their plugin exists.
 
-function Links({ title, color, items, onNavigate }) {
+function Links({ title, color, items, onNavigate, open = false }) {
+  if (items.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ fontSize: 12, color, fontWeight: 600 }}>
-        {title} ({items.length})
-      </div>
-      <div style={{ maxHeight: 84, overflow: "auto" }}>
+    <details className="sect" open={open}>
+      <summary style={{ color }}>
+        {title} <span className="count">{items.length}</span>
+      </summary>
+      <div className="sect-list">
         {items.map((p) => (
           <button
             key={p}
             title={p}
+            className="linkish"
             onClick={() => onNavigate(p)}
-            style={{
-              display: "block",
-              border: 0,
-              background: "none",
-              padding: "1px 0",
-              fontSize: 12,
-              color: "var(--link)",
-              cursor: "pointer",
-            }}
           >
             {name(p)}
           </button>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -63,26 +56,18 @@ function Methods({ sha, path, onMethod }) {
   }
   if (res.methods.length === 0) return null;
   return (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ fontSize: 12, color: "var(--accent2)", fontWeight: 600 }}>
-        ƒ Methods ({res.methods.length}) · click one for its call graph
-      </div>
-      <div style={{ maxHeight: 110, overflow: "auto" }}>
+    <details className="sect" open>
+      <summary style={{ color: "var(--accent2)" }}>
+        ƒ Methods <span className="count">{res.methods.length}</span>
+        <span className="sect-hint"> · click one for its call graph</span>
+      </summary>
+      <div className="sect-list">
         {res.methods.map((m) => (
           <button
             key={m.id}
             title="Show call graph: who calls it and what it calls"
+            className="linkish"
             onClick={() => onMethod({ id: m.id, path, line: m.line })}
-            style={{
-              display: "block",
-              border: 0,
-              background: "none",
-              padding: "1px 0",
-              fontSize: 12,
-              color: "var(--link)",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
           >
             {m.type}.{m.name}({m.arity}){" "}
             <span style={{ color: "var(--mute)" }}>
@@ -91,7 +76,7 @@ function Methods({ sha, path, onMethod }) {
           </button>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -121,7 +106,6 @@ export default function CodePanel({
   commitsExamined,
   onNavigate,
   onMethod,
-  onClose,
 }) {
   const analysedLangs = useAnalysedLanguages();
   const [result, setResult] = useState({});
@@ -162,22 +146,16 @@ export default function CodePanel({
           padding: "8px 12px",
           borderBottom: "1px solid var(--line-soft)",
           flex: "0 1 auto",
+          maxHeight: "46%",
           minHeight: 0,
           overflowY: "auto",
         }}
       >
-        <div
-          style={{ display: "flex", justifyContent: "space-between", gap: 8 }}
-        >
-          <strong
-            style={{ overflow: "hidden", textOverflow: "ellipsis" }}
-            title={path}
-          >
-            {name(path)}
-          </strong>
-          <button onClick={onClose} aria-label="Close" title="Close (Esc)">
-            ×
-          </button>
+        <div className="code-title" title={path}>
+          <strong>{name(path)}</strong>
+          <span>
+            {path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""}
+          </span>
         </div>
         {data && analysed && (
           <div className="tiles">
@@ -248,20 +226,20 @@ export default function CodePanel({
         {data && analysed && (
           <>
             <Links
-              title="→ Uses these files"
+              title="→ Uses"
               color="var(--out)"
               items={data.imports}
               onNavigate={onNavigate}
             />
             <Links
-              title="← Used by these files"
+              title="← Used by"
               color="var(--in)"
               items={data.importedBy}
               onNavigate={onNavigate}
             />
             {cycle && (
               <Links
-                title="⟲ In a circular dependency with"
+                title="⟲ Circular with"
                 color="var(--bad)"
                 items={cycle.filter((p) => p !== path)}
                 onNavigate={onNavigate}
