@@ -31,14 +31,14 @@ public class SourceFilter {
             Map.entry("cpp", "cpp"), Map.entry("cc", "cpp"), Map.entry("cxx", "cpp"), Map.entry("c++", "cpp"),
             Map.entry("hpp", "cpp"), Map.entry("hh", "cpp"), Map.entry("hxx", "cpp"), Map.entry("h++", "cpp"),
             Map.entry("ipp", "cpp"), Map.entry("tpp", "cpp"), Map.entry("inl", "cpp"),
-            Map.entry("rb", "ruby"), Map.entry("php", "php"), Map.entry("kt", "kotlin"), Map.entry("kts", "kotlin"));
+            Map.entry("rb", "ruby"), Map.entry("php", "php"), Map.entry("kt", "kotlin"), Map.entry("kts", "kotlin"),
+            Map.entry("html", "html"), Map.entry("htm", "html"));
 
     // Other text files: kept as plain nodes, not parsed.
     private static final Set<String> TEXT = Set.of(
-            "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml", "html",
+            "md", "txt", "json", "xml", "yml", "yaml", "properties", "gradle", "toml",
             "css", "scss", "sql", "sh", "swift");
 
-    //returns the language name of the corr file if it is to be kept
     public String classify(String relPath) {
         String[] segs = relPath.split("/");
         for (int i = 0; i < segs.length - 1; i++) {

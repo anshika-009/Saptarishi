@@ -40,6 +40,7 @@ public class GraphBuilder {
         CSharpImportResolver csharp = new CSharpImportResolver(files);
         RustImportResolver rust = new RustImportResolver(allPaths);
         CIncludeResolver cInclude = new CIncludeResolver(allPaths);
+        HtmlImportResolver html = new HtmlImportResolver(allPaths);
         FileRequireResolver rubyFiles = new FileRequireResolver(allPaths, "rb");
         FileRequireResolver phpFiles = new FileRequireResolver(allPaths, "php");
         CSharpImportResolver phpTypes = new CSharpImportResolver(files, "php");
@@ -107,6 +108,11 @@ public class GraphBuilder {
                     for (String t : kotlinTypes.resolveReferences(f)) {
                         if (!targets.contains(t) && ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "REFERENCE"));
                     }
+                }
+                case "html" -> {
+                    Set<String> targets = new LinkedHashSet<>();
+                    for (ParsedFile.RawImport i : f.imports()) html.resolve(f.path(), i.name()).ifPresent(targets::add);
+                    for (String t : targets) if (ids.contains(t)) edges.add(new GraphEdge(f.path(), t, "IMPORT"));
                 }
                 case "c", "cpp" -> {
                     Set<String> targets = new LinkedHashSet<>();
