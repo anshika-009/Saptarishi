@@ -3,9 +3,11 @@ package com.saptarishi.backend.graph;
 import com.saptarishi.backend.parse.GoModSupport;
 import com.saptarishi.backend.parse.ParsedFile;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +19,20 @@ public class GraphBuilder {
                             int tokens, int loc, boolean parsed) {}
     /** type: IMPORT (explicit import) or REFERENCE (same-package use, no import needed). */
     public record GraphEdge(String source, String target, String type) {}
-    public record Graph(List<GraphNode> nodes, List<GraphEdge> edges) {}
+    public record Graph(List<GraphNode> nodes, List<GraphEdge> edges) {
+
+        /**
+         * For each file, the files it imports or references. The call graph uses this to decide which files a
+         * call can reach, so every language's own import rules apply without being repeated there.
+         */
+        public Map<String, Set<String>> dependencies() {
+            Map<String, Set<String>> deps = new HashMap<>();
+            for (GraphEdge e : edges) {
+                deps.computeIfAbsent(e.source(), k -> new LinkedHashSet<>()).add(e.target());
+            }
+            return deps;
+        }
+    }
 
     public Graph build(List<ParsedFile> files, boolean includeText) {
         List<ParsedFile> kept = files.stream()

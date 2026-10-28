@@ -7,7 +7,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Which languages are analysed (have a parser). Files in any other language stay plain nodes. */
+/**
+ * Which languages are analysed (have a parser), and which of those also have a method-level call graph.
+ * Files in any other language stay plain nodes.
+ */
 @RestController
 @RequestMapping("/api/languages")
 public class LanguagesController {
@@ -20,6 +23,6 @@ public class LanguagesController {
 
     @GetMapping
     public Map<String, List<String>> get() {
-        return Map.of("analysed", registry.languages());
+        return Map.of("analysed", registry.languages(), "callGraph", registry.callGraphLanguages());
     }
 }

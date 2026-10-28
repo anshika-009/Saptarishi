@@ -18,6 +18,12 @@ public class GraphRepository {
 
     private static final int BATCH = 1000;
 
+    /**
+     * Bump this when the parsers or the call graph change what is stored for a commit. Version 2: call
+     * graph for every language with a parser, not only Java.
+     */
+    public static final int ANALYSIS_VERSION = 2;
+
     private record SymbolRow(String path, Symbol symbol) {}
 
     private final JdbcTemplate jdbc;
@@ -31,13 +37,23 @@ public class GraphRepository {
                 "select exists(select 1 from repo_snapshot where sha = ?)", Boolean.class, sha));
     }
 
+    /**
+     * Deletes the snapshot of this commit if an older analysis made it, so that it is analysed again.
+     * Everything stored for it goes with it (files, symbols, edges, calls, churn).
+     */
+    @Transactional
+    public boolean evictIfStale(String sha) {
+        return jdbc.update("delete from repo_snapshot where sha = ? and analysis_version < ?",
+                sha, ANALYSIS_VERSION) > 0;
+    }
+
     /** Insert-if-absent, all or nothing. Returns false if this SHA was already stored. */
     @Transactional
     public boolean save(String sha, String owner, String repo, Graph graph, List<ParsedFile> parsed) {
         int inserted = jdbc.update("""
-                insert into repo_snapshot (sha, owner, repo, file_count, edge_count)
-                values (?, ?, ?, ?, ?) on conflict (sha) do nothing""",
-                sha, owner, repo, graph.nodes().size(), graph.edges().size());
+                insert into repo_snapshot (sha, owner, repo, file_count, edge_count, analysis_version)
+                values (?, ?, ?, ?, ?, ?) on conflict (sha) do nothing""",
+                sha, owner, repo, graph.nodes().size(), graph.edges().size(), ANALYSIS_VERSION);
         if (inserted == 0) return false;
 
         jdbc.batchUpdate("""

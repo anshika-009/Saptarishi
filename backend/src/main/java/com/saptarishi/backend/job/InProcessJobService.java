@@ -81,6 +81,7 @@ public class InProcessJobService implements JobService {
 
     /** cleanup runs exactly once: right away if no analysis is started, otherwise when it ends. */
     private JobStatus enqueue(String sha, Analysis analysis, Runnable cleanup) {
+        repository.evictIfStale(sha); // made by an older analysis: analyse it again
         if (repository.exists(sha)) {
             cleanup.run();
             Job cached = Job.completed(sha);

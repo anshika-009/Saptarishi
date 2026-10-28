@@ -23,6 +23,12 @@ public class ParserRegistry {
         return byLanguage.get(language);
     }
 
+    /** The languages whose parser also reads methods and calls, sorted. The UI offers the call graph for these. */
+    public List<String> callGraphLanguages() {
+        return byLanguage.values().stream().filter(LanguageSupport::extractsCalls)
+                .map(LanguageSupport::language).sorted().toList();
+    }
+
     /** The languages that have a parser, sorted. The UI uses this to tell analysed files from plain ones. */
     public List<String> languages() {
         return List.copyOf(new TreeSet<>(byLanguage.keySet()));

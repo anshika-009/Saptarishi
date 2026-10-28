@@ -59,6 +59,9 @@ public class JavaLanguageSupport extends TreeSitterSupport {
     public String language() { return "java"; }
 
     @Override
+    public boolean extractsCalls() { return true; }
+
+    @Override
     protected TSLanguage grammar() { return new TreeSitterJava(); }
 
     @Override

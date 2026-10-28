@@ -69,7 +69,7 @@ public class GraphService {
         if (graph.nodes().isEmpty()) throw new IllegalArgumentException("No supported source files found");
 
         progress.update("Saving graph", 94);
-        CallGraph calls = callBuilder.build(parsed);
+        CallGraph calls = callBuilder.build(parsed, graph.dependencies());
         tx.executeWithoutResult(status -> {
             if (repository.save(sha, owner, repo, graph, parsed)) callRepository.save(sha, calls);
         });
