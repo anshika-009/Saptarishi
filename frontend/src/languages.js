@@ -14,7 +14,6 @@ export const FALLBACK_ANALYSED = [
   "cpp",
   "ruby",
   "php",
-  "kotlin",
   "html",
 ];
 

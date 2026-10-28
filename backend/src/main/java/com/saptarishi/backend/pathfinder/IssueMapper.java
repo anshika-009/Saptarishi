@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  *
  * <p>Nothing here is specific to a language. Symbols arrive already reduced to the kinds in
  * {@link SymbolKinds}. A method is recognised in whichever style a language writes it: {@code camelCase}
- * (Java, JS, Kotlin, C#), {@code snake_case} (Python, Ruby, Rust, C), {@code PascalCase} (Go, C#), or any
+ * (Java, JS, C#), {@code snake_case} (Python, Ruby, Rust, C), {@code PascalCase} (Go, C#), or any
  * name written as a call, {@code name()}. A stack frame is recognised as {@code File.java:42},
  * {@code file.py:42:7}, {@code File "app/x.py", line 42} and {@code Foo.cs:line 42}.
  */

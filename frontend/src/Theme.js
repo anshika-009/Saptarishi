@@ -30,7 +30,6 @@ export const LANG_COLORS = {
   cpp: "#59607a",
   ruby: "#a8403a",
   php: "#7b7aa6",
-  kotlin: "#a0658a",
   html: "#c0793f",
 };
 

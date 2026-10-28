@@ -31,7 +31,7 @@ public class SourceFilter {
             Map.entry("cpp", "cpp"), Map.entry("cc", "cpp"), Map.entry("cxx", "cpp"), Map.entry("c++", "cpp"),
             Map.entry("hpp", "cpp"), Map.entry("hh", "cpp"), Map.entry("hxx", "cpp"), Map.entry("h++", "cpp"),
             Map.entry("ipp", "cpp"), Map.entry("tpp", "cpp"), Map.entry("inl", "cpp"),
-            Map.entry("rb", "ruby"), Map.entry("php", "php"), Map.entry("kt", "kotlin"), Map.entry("kts", "kotlin"),
+            Map.entry("rb", "ruby"), Map.entry("php", "php"),
             Map.entry("html", "html"), Map.entry("htm", "html"));
 
     // Other text files: kept as plain nodes, not parsed.

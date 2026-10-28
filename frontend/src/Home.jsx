@@ -252,7 +252,7 @@ export default function Home({ onReady }) {
           </p>
         )}
         <p className="fineprint">
-          Java, Python, JS/TS, Go, C#, Rust, C/C++, Ruby, PHP, Kotlin · public GitHub repositories only
+          Java, Python, JS/TS, Go, C#, Rust, C/C++, Ruby, PHP · public GitHub repositories only
         </p>
       </section>
 

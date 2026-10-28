@@ -18,7 +18,7 @@ import java.util.Set;
  * names a type, so when the name is not a namespace the ones around it are tried.
  *
  * <p>The same idea fits any language where a file declares a namespace or package and imports name them or
- * a type in them, so it also links Kotlin and PHP (pass the language; PHP's {@code \} is read as a dot).
+ * a type in them, so it also links PHP (pass the language; PHP's {@code \} is read as a dot).
  */
 public final class CSharpImportResolver {
 

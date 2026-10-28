@@ -83,10 +83,9 @@ class IssueMapperTest {
     private static final String GO = "internal/server/handler.go";
     private static final String CS = "src/Shop/OrderService.cs";
     private static final String RS = "src/parser/lexer.rs";
-    private static final String KT = "src/main/kotlin/shop/Basket.kt";
 
     private final IssueMapper polyglot = new IssueMapper(
-            List.of(PY, RB, GO, CS, RS, KT),
+            List.of(PY, RB, GO, CS, RS),
             List.of(new Symbol("Invoice", "CLASS", PY),
                     new Symbol("compute_late_fee", "METHOD", PY),
                     new Symbol("Cart", "CLASS", RB),
@@ -98,9 +97,8 @@ class IssueMapperTest {
                     new Symbol("Lexer", "CLASS", RS),
                     new Symbol("next_token", "METHOD", RS),
                     new Symbol("Tokenizer", "INTERFACE", RS),          // a Rust trait
-                    new Symbol("addItem", "METHOD", KT),
                     new Symbol("render", "METHOD", PY),
-                    new Symbol("render", "METHOD", KT)));
+                    new Symbol("render", "METHOD", RB)));
 
     private Optional<Match> poly(String text, String path) {
         return polyglot.map(text).stream().filter(m -> m.path().equals(path)).findFirst();

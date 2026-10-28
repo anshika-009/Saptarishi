@@ -11,7 +11,7 @@ class TestPathsTest {
     @Test void testFilesOfEveryLanguageAreRecognised() {
         for (String p : List.of(
                 "src/test/java/org/app/OwnerTest.java", "src/main/java/org/app/OwnerIT.java", "app/UserTests.java",
-                "src/test/kotlin/BasketTest.kt", "src/BasketSpec.kt", "app/Models/UserTest.php", "tests/Unit/CartTest.php",
+                "app/Models/UserTest.php", "tests/Unit/CartTest.php",
                 "spec/models/cart_spec.rb", "lib/cart_test.rb", "test/test_cart.rb",
                 "src/parser_test.cc", "src/ParserTest.cpp", "src/test_parser.c", "src/parser_unittest.cc",
                 "pkg/handler_test.go", "src/lexer_test.rs", "src/UserTests.cs",

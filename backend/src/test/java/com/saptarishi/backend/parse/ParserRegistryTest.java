@@ -9,11 +9,11 @@ import org.junit.jupiter.api.Test;
 class ParserRegistryTest {
 
     private final ParserRegistry registry =
-            new ParserRegistry(List.of(new PythonLanguageSupport(), new KotlinLanguageSupport()));
+            new ParserRegistry(List.of(new PythonLanguageSupport(), new RubyLanguageSupport()));
 
     @Test
     void listsItsLanguagesSorted() {
-        assertEquals(List.of("kotlin", "python"), registry.languages());
+        assertEquals(List.of("python", "ruby"), registry.languages());
     }
 
     @Test

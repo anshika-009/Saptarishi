@@ -2,7 +2,7 @@
 
 Paste a GitHub repository URL and get an interactive map of its code: files grouped by folder, import dependencies drawn as edges, and a read-only code panel with per-file metrics.
 
-Analyses **Java, JavaScript, TypeScript, Python, Go, C#, Rust, C, C++, Ruby, PHP and Kotlin** (see [Languages](#languages)). Files in other languages (Swift, SQL, shell, Markdown and so on) are not part of the graph.
+Analyses **Java, JavaScript, TypeScript, Python, Go, C#, Rust, C, C++, Ruby and PHP** (see [Languages](#languages)). Files in other languages (Swift, SQL, shell, Markdown and so on) are not part of the graph.
 
 ## How it works
 
@@ -38,7 +38,6 @@ Every language below gives the same things: imports, symbols (classes, functions
 | C, C++ | tree-sitter | `#include`, searched in the includer's folder, then up the tree and its `include/`, `inc/` and `src/`, then by unique path ending |
 | Ruby | tree-sitter | `require_relative`, and `require` searched in `lib/` folders |
 | PHP | tree-sitter | `use` (by namespace and class) and `require`/`include` of a file |
-| Kotlin | patterns | `import` and same-package types, by the types a file mentions |
 
 "Patterns" means comments and strings are blanked and the rest is read with regular expressions, because no usable grammar is bundled. It is an approximation and can be fooled by unusual formatting.
 
@@ -214,6 +213,6 @@ Docker must be running: the database tests start PostgreSQL through Testcontaine
 - [x] Search and filters
 - [x] Health score and god files
 - [ ] Churn (needs git history, via JGit)
-- [x] Multi-language support: JavaScript, TypeScript, Python, Go, C#, Rust, C, C++, Ruby, PHP, Kotlin
+- [x] Multi-language support: JavaScript, TypeScript, Python, Go, C#, Rust, C, C++, Ruby, PHP
 - [ ] Hardening: zip-bomb tests, error handling, timing benchmarks
 - [ ] Zip upload and a visual redesign
