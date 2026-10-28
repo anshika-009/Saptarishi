@@ -17,6 +17,23 @@ export const C = {
   sans: "Inter, system-ui, sans-serif",
 };
 
+// One muted hue per analysed language, all within the Beige & Ink palette.
+export const LANG_COLORS = {
+  java: "#b89463",
+  javascript: "#c4a23a",
+  typescript: "#4f7186",
+  python: "#5d7f55",
+  go: "#4e8a8a",
+  csharp: "#7a5a8c",
+  rust: "#a4573a",
+  c: "#6f7480",
+  cpp: "#59607a",
+  ruby: "#a8403a",
+  php: "#7b7aa6",
+  kotlin: "#a0658a",
+  html: "#c0793f",
+};
+
 export const FONT = { mono: '"JetBrains Mono", ui-monospace, monospace' };
 
 // Pale sand (stable) to deep terracotta (changed often and complex). h is 0..100.

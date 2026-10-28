@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { FONT, defineMonaco } from "./Theme";
+import { useAnalysedLanguages } from "./languages";
 
 const name = (p) => p.split("/").pop();
 
 // Languages with a parser. Others are shown as plain files until their plugin exists.
-const ANALYSED = new Set(["java"]);
 
 function Links({ title, color, items, onNavigate }) {
   return (
@@ -123,6 +123,7 @@ export default function CodePanel({
   onMethod,
   onClose,
 }) {
+  const analysedLangs = useAnalysedLanguages();
   const [result, setResult] = useState({});
 
   useEffect(() => {
@@ -143,7 +144,7 @@ export default function CodePanel({
   }, [sha, path]);
 
   const { data, error } = result.path === path ? result : {};
-  const analysed = data ? ANALYSED.has(data.language) : false;
+  const analysed = data ? analysedLangs.has(data.language) : false;
 
   return (
     <div

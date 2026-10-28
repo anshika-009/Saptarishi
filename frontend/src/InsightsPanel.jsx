@@ -1,13 +1,10 @@
 import { useState } from "react";
-import { isTest } from "./graphUtils";
+import { isTest, stripExt } from "./graphUtils";
 import { heatColor } from "./Theme";
 
 const TOP = 25;
 const name = (p) =>
-  p
-    .split("/")
-    .pop()
-    .replace(/\.java$/, "");
+  stripExt(p.split("/").pop());
 const dir = (p) => {
   const i = p.lastIndexOf("/");
   return i < 0 ? "" : p.slice(0, i);

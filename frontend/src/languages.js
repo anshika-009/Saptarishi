@@ -15,6 +15,7 @@ export const FALLBACK_ANALYSED = [
   "ruby",
   "php",
   "kotlin",
+  "html",
 ];
 
 let pending = null;
@@ -27,7 +28,7 @@ function loadAnalysed() {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((j) => new Set(j.analysed))
+      .then((j) => new Set(Array.isArray(j.analysed) ? j.analysed : FALLBACK_ANALYSED))
       .catch(() => {
         pending = null; // try again next time
         return new Set(FALLBACK_ANALYSED);
@@ -40,7 +41,14 @@ export function useAnalysedLanguages() {
   const [set, setSet] = useState(() => new Set(FALLBACK_ANALYSED));
   useEffect(() => {
     let live = true;
-    loadAnalysed().then((s) => live && setSet(s));
+    loadAnalysed().then(
+      (s) =>
+        // keep the old Set when nothing changed, so the graph isn't rebuilt for nothing
+        live &&
+        setSet((old) =>
+          old.size === s.size && [...s].every((l) => old.has(l)) ? old : s,
+        ),
+    );
     return () => {
       live = false;
     };

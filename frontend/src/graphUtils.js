@@ -1,18 +1,39 @@
-// True for anything under a test/ or tests/ folder (mirrors the backend rule).
-export const isTest = (p) => /(^|\/)tests?\//.test(p);
+// Mirrors HealthScore.isTestPath on the backend: test folders plus each language's
+// test-file naming convention.
+export const isTest = (p) => {
+  const path = "/" + p;
+  if (/\/(tests?|__tests__)\//i.test(path)) return true;
+  if (/\/[^/]*\.(unit|integration)?tests?\//i.test(path)) return true;
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return (
+    /^.+\.(test|spec)\.[cm]?[jt]sx?$/.test(name) ||
+    /^test_.+\.py$/.test(name) ||
+    /^.+_test\.py$/.test(name) ||
+    name === "conftest.py" ||
+    name.endsWith("_test.go") ||
+    /^(.*[a-z0-9])?Tests?\.cs$/.test(name) ||
+    name === "tests.rs" ||
+    name.endsWith("_test.rs") ||
+    name.endsWith("_tests.rs")
+  );
+};
+
+// "Foo.java" -> "Foo", "util.test.ts" -> "util.test"
+export const stripExt = (name) => name.replace(/\.[^.]+$/, "");
 
 // Converts the API response into Cytoscape elements.
 // Folders become compound nodes. Chains of folders that hold no files and have a
 // single child folder (src/main/java/org/...) are merged into one box.
 export function toElements(
   { nodes, edges },
-  { hideTests = true, analysedOnly = false, analysed = new Set(["java"]) } = {},
+  { hideTests = true, analysedOnly = false, analysed = new Set() } = {},
 ) {
   const files = nodes.filter(
     (n) =>
+      n.language !== "gomod" && // helper file (module path), not a source file
       !n.id.endsWith("package-info.java") &&
       !(analysedOnly && !analysed.has(n.language)) &&
-      !(hideTests && /(^|\/)test\//.test(n.id)),
+      !(hideTests && isTest(n.id)),
   );
   const ids = new Set(files.map((n) => n.id));
 
@@ -71,10 +92,7 @@ export function toElements(
     els.push({
       data: {
         id: n.id,
-        label: n.id
-          .split("/")
-          .pop()
-          .replace(/\.java$/, ""),
+        label: stripExt(n.id.split("/").pop()),
         parent: p ? "dir:" + p : undefined,
         kind: "file",
         language: n.language,

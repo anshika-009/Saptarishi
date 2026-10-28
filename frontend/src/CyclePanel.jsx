@@ -1,11 +1,8 @@
 import { useMemo } from "react";
-import { isTest } from "./graphUtils";
+import { isTest, stripExt } from "./graphUtils";
 
 const name = (p) =>
-  p
-    .split("/")
-    .pop()
-    .replace(/\.java$/, "");
+  stripExt(p.split("/").pop());
 const dir = (p) => {
   const i = p.lastIndexOf("/");
   return i < 0 ? "" : p.slice(0, i);

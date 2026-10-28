@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -22,6 +24,7 @@ public class IssueSource {
                         List<String> labels, int comments, String createdAt) {}
 
     private static final int MAX_BODY = 20_000;
+    private static final int MAX_ISSUES = 50;
 
     private final RestClient http;
 
@@ -39,9 +42,35 @@ public class IssueSource {
         this.http = builder.build();
     }
 
+    /**
+     * Label groups, searched one call each. GitHub allows at most five AND/OR/NOT operators in a query and
+     * every comma in a label list counts as an OR, so one long list does not fit. Label matching is
+     * case-insensitive.
+     */
+    private static final List<List<String>> LABEL_GROUPS = List.of(
+            List.of("good first issue", "good-first-issue", "good first bug", "first-timers-only", "beginner"),
+            List.of("help wanted", "help-wanted", "beginner-friendly", "easy", "up-for-grabs"));
+
     public List<Issue> fetch(String owner, String repo) throws IOException {
-        String q = "repo:" + owner + "/" + repo
-                + " is:issue is:open no:assignee label:\"good first issue\",\"good-first-issue\",\"help wanted\", beginner";
+        Map<Integer, Issue> byNumber = new LinkedHashMap<>();
+        IOException failure = null;
+        int ok = 0;
+        for (List<String> group : LABEL_GROUPS) {
+            try {
+                for (Issue i : search(owner, repo, group)) byNumber.putIfAbsent(i.number(), i);
+                ok++;
+            } catch (IOException e) {
+                failure = e;
+                if (e.getMessage() != null && e.getMessage().contains("rate limit")) break;
+            }
+        }
+        if (ok == 0 && failure != null) throw failure; // every call failed: tell the user why
+        return byNumber.values().stream().limit(MAX_ISSUES).toList();
+    }
+
+    private List<Issue> search(String owner, String repo, List<String> labels) throws IOException {
+        String q = "repo:" + owner + "/" + repo + " is:issue is:open no:assignee label:"
+                + labels.stream().map(l -> "\"" + l + "\"").collect(Collectors.joining(","));
         Map<String, Object> body;
         try {
             body = http.get()
@@ -62,16 +91,17 @@ public class IssueSource {
         if (body == null || !(body.get("items") instanceof List<?> items)) return out;
         for (Object o : items) {
             if (!(o instanceof Map<?, ?> m)) continue;
-            List<String> labels = new ArrayList<>();
+            if (m.get("pull_request") != null) continue; // is:issue already excludes these; belt and braces
+            List<String> names = new ArrayList<>();
             if (m.get("labels") instanceof List<?> ls) {
                 for (Object l : ls) {
-                    if (l instanceof Map<?, ?> lm && lm.get("name") != null) labels.add(lm.get("name").toString());
+                    if (l instanceof Map<?, ?> lm && lm.get("name") != null) names.add(lm.get("name").toString());
                 }
             }
             String text = str(m.get("body"));
             out.add(new Issue(num(m.get("number")), str(m.get("title")),
                     text.length() > MAX_BODY ? text.substring(0, MAX_BODY) : text,
-                    str(m.get("html_url")), labels, num(m.get("comments")), str(m.get("created_at"))));
+                    str(m.get("html_url")), names, num(m.get("comments")), str(m.get("created_at"))));
         }
         return out;
     }

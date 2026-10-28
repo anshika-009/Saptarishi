@@ -7,7 +7,8 @@ import SearchBox from "./SearchBox";
 import HealthPanel from "./HealthPanel";
 import CallGraph from "./CallGraph";
 import Logo from "./Logo";
-import { C, heatColor } from "./Theme";
+import { C, LANG_COLORS, heatColor } from "./Theme";
+import { useAnalysedLanguages } from "./languages";
 import PathfinderPanel from "./PathfinderPanel";
 import Guide from "./Guide";
 import CyclePanel from "./CyclePanel";
@@ -66,10 +67,10 @@ const style = [
       height: "mapData(complexity, 0, 40, 22, 56)",
     },
   },
-  {
-    selector: 'node[language = "java"]',
-    style: { "background-color": C.java },
-  },
+  ...Object.entries(LANG_COLORS).map(([l, color]) => ({
+    selector: `node[language = "${l}"]`,
+    style: { "background-color": color },
+  })),
   {
     selector: 'node[kind = "folder"]',
     style: {
@@ -236,22 +237,24 @@ export default function Atlas({ sha, onBack }) {
     () => [...new Set((data?.nodes ?? []).map((n) => n.language))].sort(),
     [data],
   );
+  const analysed = useAnalysedLanguages();
   const stats = useMemo(() => {
     if (!data) return null;
     const by = {};
     for (const n of data.nodes) by[n.language] = (by[n.language] || 0) + 1;
+    const parsedCount = data.nodes.filter((n) => analysed.has(n.language)).length;
     return {
       by,
-      java: by.java || 0,
+      parsedCount,
       total: data.nodes.length,
       edges: data.edges.length,
       unparsed: data.nodes.filter((n) => n.parsed === false).length,
     };
-  }, [data]);
-  // Only Java is parsed, so other languages can never have arrows. Hide them by default
-  // (unless there is no Java at all, where hiding would leave an empty map).
+  }, [data, analysed]);
+  // Languages without a parser can never have arrows. Hide them by default
+  // (unless nothing is parsed at all, where hiding would leave an empty map).
   const [showUnanalysed, setShowUnanalysed] = useState(false);
-  const hideUnanalysed = !showUnanalysed && (stats?.java ?? 0) > 0;
+  const hideUnanalysed = !showUnanalysed && (stats?.parsedCount ?? 0) > 0;
   const metricsById = useMemo(
     () => new Map((analysis?.nodes ?? []).map((m) => [m.id, m])),
     [analysis],
@@ -338,6 +341,7 @@ export default function Atlas({ sha, onBack }) {
     let elements = toElements(data, {
       hideTests,
       analysedOnly: hideUnanalysed,
+      analysed,
     });
     if (flat) {
       elements = elements
@@ -452,7 +456,7 @@ export default function Atlas({ sha, onBack }) {
       cyRef.current = null;
       frameRef.current = null;
     };
-  }, [data, hideTests, layoutName, hideUnanalysed]);
+  }, [data, hideTests, layoutName, hideUnanalysed, analysed]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -744,25 +748,25 @@ export default function Atlas({ sha, onBack }) {
           </button>
         )}
       </div>
-      {stats && stats.java < stats.total && (
+      {stats && stats.parsedCount < stats.total && (
         <div className="notice" role="note">
           <span>
-            {stats.java === 0
-              ? "No Java files were found, so there are no dependency arrows. Saptarishi only analyses Java for now; "
-              : `Only Java files get dependency arrows. ${stats.total - stats.java} of ${stats.total} files are other languages (`}
+            {stats.parsedCount === 0
+              ? "None of the languages in this repository have a parser yet, so there are no dependency arrows; "
+              : `${stats.total - stats.parsedCount} of ${stats.total} files are in languages without a parser, so they get no dependency arrows (`}
             {Object.entries(stats.by)
-              .filter(([l]) => l !== "java")
+              .filter(([l]) => !analysed.has(l))
               .sort((x, y) => y[1] - x[1])
               .slice(0, 3)
               .map(([l, c]) => `${l} ${c}`)
               .join(", ")}
-            {stats.java === 0
+            {stats.parsedCount === 0
               ? " are shown as unconnected dots."
               : hideUnanalysed
                 ? "), so they are hidden."
                 : "), shown here as unconnected dots."}
           </span>
-          {stats.java > 0 && (
+          {stats.parsedCount > 0 && (
             <button type="button" onClick={() => setShowUnanalysed((v) => !v)}>
               {hideUnanalysed ? "Show them" : "Hide them"}
             </button>
@@ -778,10 +782,10 @@ export default function Atlas({ sha, onBack }) {
           </span>
         </div>
       )}
-      {stats && stats.java > 0 && stats.edges === 0 && (
+      {stats && stats.parsedCount > 0 && stats.edges === 0 && (
         <div className="notice" role="alert">
           <span>
-            {stats.java} Java files were found but no imports between them could
+            {stats.parsedCount} source files were found but no imports between them could
             be matched to files in this repository, so there are no arrows.
           </span>
         </div>
