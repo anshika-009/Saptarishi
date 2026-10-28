@@ -17,40 +17,70 @@ export const FALLBACK_ANALYSED = [
   "html",
 ];
 
+// The languages that also have a method-level call graph (Used by / Uses / Methods).
+export const FALLBACK_CALL_GRAPH = [
+  "java",
+  "python",
+  "javascript",
+  "typescript",
+  "go",
+  "csharp",
+  "rust",
+];
+
+const FALLBACK = {
+  analysed: new Set(FALLBACK_ANALYSED),
+  callGraph: new Set(FALLBACK_CALL_GRAPH),
+};
+
 let pending = null;
 
-// The languages that have a parser, from GET /api/languages. Asked once per page load.
-function loadAnalysed() {
+// What the backend analyses, from GET /api/languages. Asked once per page load.
+function loadSupport() {
   if (!pending) {
     pending = fetch("/api/languages")
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })
-      .then((j) => new Set(Array.isArray(j.analysed) ? j.analysed : FALLBACK_ANALYSED))
+      .then((j) => ({
+        analysed: new Set(
+          Array.isArray(j.analysed) ? j.analysed : FALLBACK_ANALYSED,
+        ),
+        // an older backend does not send callGraph: it only had Java
+        callGraph: new Set(Array.isArray(j.callGraph) ? j.callGraph : ["java"]),
+      }))
       .catch(() => {
         pending = null; // try again next time
-        return new Set(FALLBACK_ANALYSED);
+        return FALLBACK;
       });
   }
   return pending;
 }
 
-export function useAnalysedLanguages() {
-  const [set, setSet] = useState(() => new Set(FALLBACK_ANALYSED));
+const same = (a, b) => a.size === b.size && [...a].every((l) => b.has(l));
+
+// { analysed, callGraph }: the languages that have a parser, and those that also have a call graph.
+export function useLanguageSupport() {
+  const [support, setSupport] = useState(FALLBACK);
   useEffect(() => {
     let live = true;
-    loadAnalysed().then(
-      (s) =>
-        // keep the old Set when nothing changed, so the graph isn't rebuilt for nothing
-        live &&
-        setSet((old) =>
-          old.size === s.size && [...s].every((l) => old.has(l)) ? old : s,
-        ),
-    );
+    loadSupport().then((s) => {
+      if (!live) return;
+      // keep the old object when nothing changed, so the graph isn't rebuilt for nothing
+      setSupport((cur) =>
+        same(cur.analysed, s.analysed) && same(cur.callGraph, s.callGraph)
+          ? cur
+          : s,
+      );
+    });
     return () => {
       live = false;
     };
   }, []);
-  return set;
+  return support;
+}
+
+export function useAnalysedLanguages() {
+  return useLanguageSupport().analysed;
 }

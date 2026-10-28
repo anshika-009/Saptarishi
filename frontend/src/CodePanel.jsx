@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { FONT, defineMonaco } from "./Theme";
-import { useAnalysedLanguages } from "./languages";
+import { useLanguageSupport } from "./languages";
 
 const name = (p) => p.split("/").pop();
 
@@ -69,7 +69,8 @@ function Methods({ sha, path, onMethod }) {
             className="linkish"
             onClick={() => onMethod({ id: m.id, path, line: m.line })}
           >
-            {m.type}.{m.name}({m.arity}){" "}
+            {m.type ? `${m.type}.` : ""}
+            {m.name}({m.arity}){" "}
             <span style={{ color: "var(--mute)" }}>
               {m.callers} callers · calls {m.callees}
             </span>
@@ -107,7 +108,7 @@ export default function CodePanel({
   onNavigate,
   onMethod,
 }) {
-  const analysedLangs = useAnalysedLanguages();
+  const { analysed: analysedLangs, callGraph } = useLanguageSupport();
   const [result, setResult] = useState({});
 
   useEffect(() => {
@@ -247,7 +248,7 @@ export default function CodePanel({
             )}
           </>
         )}
-        {data && analysed && data.language === "java" && (
+        {data && analysed && callGraph.has(data.language) && (
           <Methods sha={sha} path={path} onMethod={onMethod} />
         )}
       </div>

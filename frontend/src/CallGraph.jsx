@@ -90,7 +90,7 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
         ...data.nodes.map((n) => ({
           data: {
             id: n.id,
-            label: `${n.type}.${n.name}`,
+            label: n.type ? `${n.type}.${n.name}` : n.name,
             path: n.path,
             line: n.line,
             complexity: n.complexity,
@@ -145,7 +145,10 @@ export default function CallGraph({ sha, method, onOpen, onClose }) {
             whiteSpace: "nowrap",
           }}
         >
-          Call graph{rootNode ? ` · ${rootNode.type}.${rootNode.name}` : ""}
+          Call graph
+          {rootNode
+            ? ` · ${rootNode.type ? rootNode.type + "." : ""}${rootNode.name}`
+            : ""}
         </strong>
         <select value={dir} onChange={(e) => setDir(e.target.value)}>
           <option value="both">Callers and callees</option>

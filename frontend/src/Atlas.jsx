@@ -157,6 +157,10 @@ const style = [
   },
 ];
 
+// Tuning for the left-to-right Hierarchy layout (see LAYOUTS below).
+const LAYER_GAP = 2.8;
+const SIBLING_GAP = 1.4;
+
 const LAYOUTS = {
   clusters: {
     label: "Clusters (by folder)",
@@ -178,12 +182,15 @@ const LAYOUTS = {
     },
   },
   hierarchy: {
-    label: "Hierarchy (entry points on top)",
+    label: "Hierarchy (entry points on the left)",
     flat: true,
     options: {
       name: "breadthfirst",
       directed: true,
       spacingFactor: 1.2,
+      // Lay the layers out left to right: swap the axes. LAYER_GAP spreads the layers apart so the
+      // labels and arrows between them stay readable; SIBLING_GAP spreads the files inside a layer.
+      transform: (_node, p) => ({ x: p.y * LAYER_GAP, y: p.x * SIBLING_GAP }),
       padding: 40,
       animate: true,
       animationDuration: 450,
@@ -446,7 +453,7 @@ export default function Atlas({ sha, onBack }) {
     });
     cy.on("mouseout", 'node[kind = "file"]', () => {
       setHover(null);
-      if (containerRef.current) containerRef.current.style.cursor = "";
+      if (containerRef.current) containerRef.current.style.cursor = "grab";
     });
     cy.on("pan zoom", () => setHover(null));
 
@@ -470,10 +477,10 @@ export default function Atlas({ sha, onBack }) {
       const bb = bounds();
       const z = cy.zoom();
       const p = cy.pan();
+      // The graph may be dragged anywhere as long as a slice of it stays in view; "Fit" brings it back.
       const axis = (lo, hi, size, pan) => {
-        const span = (hi - lo) * z;
-        if (span + 2 * PAD <= size) return (size - span) / 2 - lo * z; // centred
-        return Math.min(PAD - lo * z, Math.max(size - PAD - hi * z, pan));
+        const keep = size * 0.15;
+        return Math.min(size - keep - lo * z, Math.max(keep - hi * z, pan));
       };
       const nx = axis(bb.x1, bb.x2, cy.width(), p.x);
       const ny = axis(bb.y1, bb.y2, cy.height(), p.y);
@@ -519,6 +526,14 @@ export default function Atlas({ sha, onBack }) {
     layout.one("layoutstop", frame);
     layout.run();
     cy.on("tap", (evt) => evt.target === cy && setSelection(null));
+    // grab cursor on the background, closed hand while dragging the view
+    if (containerRef.current) containerRef.current.style.cursor = "grab";
+    cy.on("tapstart", (evt) => {
+      if (evt.target === cy && containerRef.current) containerRef.current.style.cursor = "grabbing";
+    });
+    cy.on("tapend", () => {
+      if (containerRef.current) containerRef.current.style.cursor = "grab";
+    });
     cyRef.current = cy;
     return () => {
       ro.disconnect();

@@ -45,7 +45,7 @@ A few rules worth knowing:
 
 - A `.h` file is read as C++ only if the repository has at least as many C++ files as `.c` files; otherwise it is C.
 - `.c`/`.h` includes are matched by folder layout, not by build flags (`-I`), which a repository does not record.
-- Only Java has the method call graph.
+- The method call graph covers Java, Python, JavaScript, TypeScript, Go, C# and Rust. C, C++, Ruby, PHP and Kotlin have file-level edges only.
 
 **Languages without a parser** are never an error. Files the filter does not recognise as source (Swift, SQL, shell, Markdown and so on) are kept out of the graph. A language that has a file extension mapped but no parser yet falls back to a plain node: it keeps its place in the folder tree with a line count and no edges, and the Atlas hides it by default with a button to show it. The backend lists the analysed languages at `GET /api/languages`, and the Atlas shows a line such as _"All 4 languages analysed"_ or _"3 of 4 languages analysed"_ with the file count per language.
 
@@ -99,7 +99,7 @@ Do not use the default credentials outside local development.
 - **Node size** reflects cyclomatic complexity.
 - **Click a file** to open the code panel and highlight its neighbours. Blue edges are files it imports, and green edges are files that import it. Click the background to clear the selection.
 - **Code panel** shows read-only source with syntax highlighting, token count, complexity, line count, and clickable _Imports_ and _Imported by_ lists.
-- **Layouts:** _Clusters_ groups files by folder. _Hierarchy_ arranges them top-down with entry points (files nobody imports) on top.
+- **Layouts:** _Clusters_ groups files by folder. _Hierarchy_ arranges them left to right with entry points (files nobody imports) on the left.
 - **Search:** the top bar searches file paths and symbol names (classes, interfaces, methods). Picking a result selects and centres that node. Picking a symbol also opens the file at its line.
 - **Language line:** under the toolbar, how many of the repository's languages were analysed and how many files each has. Analysed files are tan. A language without a parser yet would be grey and hidden by default, with a button to show it.
 - **Filters:** a language dropdown and a path filter (for example `controller`) hide non-matching files without re-running the layout. Folders left empty are hidden too.
@@ -194,7 +194,7 @@ Docker must be running: the database tests start PostgreSQL through Testcontaine
 
 - Search covers source files in the graph only, not text files.
 - Files in languages without a parser (see [Languages](#languages)) are not in the graph.
-- Include and import resolution is heuristic for C/C++, Ruby and PHP (no build flags, no Composer autoload map), so some edges may be missing, and the call graph is Java only.
+- Include and import resolution is heuristic for C/C++, Ruby and PHP (no build flags, no Composer autoload map), so some edges may be missing. The method call graph does not cover C, C++, Ruby, PHP or Kotlin yet.
 - Case-insensitive file systems are not modelled: `#include "Foo.H"` will not find `foo.h`.
 - Only imports that resolve to files inside the repository become edges. Library imports are ignored.
 - Public GitHub repositories only.
